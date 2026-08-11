@@ -6,6 +6,20 @@ import '../main_screen.dart';
 class BiometricSetupScreen extends StatelessWidget {
   const BiometricSetupScreen({super.key});
 
+  void _goToMain(BuildContext context) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const MainScreen()),
+      (route) => false,
+    );
+  }
+
+  void _showSuccessSnackbar(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Face ID enabled!'), duration: Duration(seconds: 1)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,7 +30,6 @@ class BiometricSetupScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 40),
-              // Success Indicator
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -26,56 +39,30 @@ class BiometricSetupScreen extends StatelessWidget {
                 child: const Icon(Icons.check_circle, color: AppColors.primaryTeal, size: 60),
               ),
               const SizedBox(height: 40),
-              Text(
-                'Almost there!',
-                style: AppTheme.headingStyle(fontSize: 32),
-                textAlign: TextAlign.center,
-              ),
+              Text('Almost there!', style: AppTheme.headingStyle(fontSize: 28)),
               const SizedBox(height: 16),
               Text(
-                'Your account has been created. Now, let\'s make it secure with Face ID.',
-                style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600], height: 1.5),
+                'Enable Face ID for faster, secure logins. Your biometric data stays on your device.',
                 textAlign: TextAlign.center,
+                style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 48),
+              Container(
+                padding: const EdgeInsets.all(40),
+                decoration: BoxDecoration(
+                  color: AppColors.kinMistLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.primaryTeal.withValues(alpha: 0.2), width: 2),
+                ),
+                child: Icon(Icons.face, size: 80, color: AppColors.primaryTeal.withValues(alpha: 0.8)),
               ),
               const Spacer(),
-              
-              // Biometric Illustration Simulation
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryTeal.withValues(alpha: 0.05),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const Icon(Icons.face, size: 100, color: AppColors.primaryTeal),
-                  // Floating elements
-                  const Positioned(
-                    top: 20,
-                    right: 20,
-                    child: Icon(Icons.security, color: AppColors.primaryCoral, size: 32),
-                  ),
-                ],
-              ),
-              
-              const Spacer(),
-              
-              // Buttons
               SizedBox(
-                width: double.infinity,
-                height: 60,
+                width: double.infinity, height: 56,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Simulate Biometric success
                     _showSuccessSnackbar(context);
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const MainScreen()),
-                      (route) => false,
-                    );
+                    _goToMain(context);
                   },
                   style: AppTheme.buttonStyle(backgroundColor: AppColors.primaryTeal),
                   child: const Text('Enable Face ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
@@ -83,39 +70,14 @@ class BiometricSetupScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const MainScreen()),
-                    (route) => false,
-                  );
-                },
-                child: Text(
-                  'Maybe Later',
-                  style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+                onPressed: () => _goToMain(context),
+                child: Text('Maybe Later',
+                    style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold, fontSize: 16)),
               ),
               const SizedBox(height: 20),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showSuccessSnackbar(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.verified, color: Colors.white),
-            const SizedBox(width: 12),
-            const Text('Biometrics enabled successfully!'),
-          ],
-        ),
-        backgroundColor: AppColors.primaryTeal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
