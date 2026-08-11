@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "kin_app",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "kin_app (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "kin_app (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "Stitch Proxy",
+            "request": "launch",
+            "type": "dart",
+            "program": "scripts/stitch_proxy.dart"
+        }
+    ]
+}
