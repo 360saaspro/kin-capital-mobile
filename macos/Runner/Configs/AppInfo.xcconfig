@@ -8,7 +8,7 @@
 PRODUCT_NAME = kin_app
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.kinapp.kinApp
+PRODUCT_BUNDLE_IDENTIFIER = com.studio.kinapp.bnk
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.example.kinapp. All rights reserved.
