@@ -1,7 +1,7 @@
-# Kin Capital Rails API Client
-# Single point of truth for the backend contract. Every call maps 1:1 to
-# an endpoint in the FastAPI backend (app.py).
-# Base URL overridable via --dart-define=API_BASE_URL (Google Antigravity / emulator friendly)
+// Kin Capital Rails API Client
+// Single point of truth for the backend contract. Every call maps 1:1 to
+// an endpoint in the FastAPI backend (app.py).
+// Base URL overridable via --dart-define=API_BASE_URL (Google Antigravity / emulator friendly)
 
 import 'dart:convert';
 import 'dart:io';

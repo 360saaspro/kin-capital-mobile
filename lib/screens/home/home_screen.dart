@@ -10,11 +10,9 @@ import '../activity/activity_screen.dart';
 import '../activity/transaction_detail_screen.dart';
 import '../capital_rails/kin_capital_rails_screen.dart';
 import '../pots/yard_pot_screen.dart';
-import '../pots/round_up_config_screen.dart';
 import '../send/recipients_screen.dart';
 import 'add_money_methods_screen.dart';
 import 'notifications_screen.dart';
-import 'split_bill_selection_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? entityId;
@@ -344,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppColors.kinCoral.withValues(alpha: 0.5)),
+          Icon(Icons.chevron_right, color: AppColors.kinCoral.withValues(alpha: 0.5)),
         ],
       ),
     );

@@ -159,7 +159,7 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text('${c.creditScore.toStringAsFixed(0)}',
+              Text(c.creditScore.toStringAsFixed(0),
                   style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
               const SizedBox(width: 8),
               const Text('/ 850', style: TextStyle(color: Colors.white54, fontSize: 18)),
@@ -368,7 +368,7 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
         onPressed: () async {
           try {
             final result = await _api.orchestrate(widget.entityId);
-            if (!context.mounted) return;
+            if (!mounted) return;
             showDialog(
               context: context,
               builder: (_) => AlertDialog(
@@ -396,7 +396,7 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
               ),
             );
           } catch (e) {
-            if (!context.mounted) return;
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Orchestration failed: $e')));
           }
         },
