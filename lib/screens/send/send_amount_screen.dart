@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/swipe_to_send_button.dart';
+import '../../models/api_models.dart';
+import '../../services/api_service.dart';
+import '../../services/app_config.dart';
 import 'processing_transfer_screen.dart';
 
 class SendAmountScreen extends StatefulWidget {
+  final String? entityId;
   final String recipientName;
   final String? avatarUrl;
   final String flagEmoji;
 
   const SendAmountScreen({
     super.key,
+    this.entityId,
     required this.recipientName,
     this.avatarUrl,
     this.flagEmoji = '🇯🇲',
@@ -21,10 +26,59 @@ class SendAmountScreen extends StatefulWidget {
 }
 
 class _SendAmountScreenState extends State<SendAmountScreen> {
-  final String _amount = '100';
+  final _api = ApiService();
+  final _amountController = TextEditingController(text: '100');
+
+  late final String _entityId;
+
+  bool _loading = false;
+  RouteResult? _route;
+
+  static const double _exchangeRate = 195.0; // 1 USD = 195 JMD (demo)
+
+  @override
+  void initState() {
+    super.initState();
+    _entityId = widget.entityId ?? AppConfig().entityId;
+    _fetchRoute();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchRoute() async {
+    final amt = double.tryParse(_amountController.text) ?? 100;
+    if (amt <= 0) return;
+    setState(() => _loading = true);
+    try {
+      final route = await _api.routeTransfer(
+        fromEntity: _entityId,
+        toEntity: 'recipient_001',
+        amount: amt,
+      );
+      if (mounted) setState(() => _route = route);
+    } catch (_) {
+      // API offline — use best-effort data
+      if (mounted) setState(() => _route = null);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    final fee = _route?.fee ?? 0;
+    final feePct = _route?.feePct ?? 5.0;
+    final eta = _route?.eta ?? 'seconds';
+    final routeName = _route?.selectedRoute ?? 'Stablecoin';
+
+    final recipientAmount = amount * _exchangeRate;
+    final feeDisplay = fee > 0 ? '\$${fee.toStringAsFixed(2)}' : '\$${(amount * 0.05).toStringAsFixed(2)}';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -34,10 +88,7 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
           icon: const Icon(Icons.close, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Send Money',
-          style: AppTheme.headingStyle(fontSize: 18),
-        ),
+        title: Text('Send Money', style: AppTheme.headingStyle(fontSize: 18)),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -58,58 +109,46 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
                   children: [
                     CircleAvatar(
                       radius: 12,
-                      backgroundImage: widget.avatarUrl != null 
-                        ? NetworkImage(widget.avatarUrl!) 
-                        : null,
+                      backgroundImage: widget.avatarUrl != null ? NetworkImage(widget.avatarUrl!) : null,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      widget.recipientName,
-                      style: AppTheme.bodyStyle(fontWeight: FontWeight.w600),
-                    ),
+                    Text(widget.recipientName, style: AppTheme.bodyStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(width: 4),
                     Text(widget.flagEmoji),
                   ],
                 ),
               ),
               const SizedBox(height: 48),
-              
-              // Large Amount
+
+              // Amount Input
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    '£',
-                    style: AppTheme.headingStyle(
-                      fontSize: 48,
-                      color: AppColors.primaryTeal,
+                  Text('\$', style: AppTheme.headingStyle(fontSize: 48, color: AppColors.primaryTeal)),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: AppTheme.headingStyle(fontSize: 80, color: AppColors.primaryTeal),
+                      decoration: const InputDecoration(border: InputBorder.none),
+                      onChanged: (_) => _fetchRoute(),
                     ),
-                  ),
-                  Text(
-                    _amount,
-                    style: AppTheme.headingStyle(
-                      fontSize: 80,
-                      color: AppColors.primaryTeal,
-                    ),
-                  ),
-                  Container(
-                    width: 2,
-                    height: 60,
-                    color: AppColors.primaryTeal.withValues(alpha: 0.2),
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 16),
               Text(
-                '${widget.recipientName} gets \$19,500 JMD',
+                '${widget.recipientName} gets \$${recipientAmount.toStringAsFixed(0)} JMD',
                 style: AppTheme.headingStyle(fontSize: 20),
               ),
               const SizedBox(height: 8),
               Text(
-                'FEE: £5.50 • RATE: 1 GBP = 195 JMD',
+                'FEE: $feeDisplay • RATE: 1 USD = $_exchangeRate JMD',
                 style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 4),
@@ -119,99 +158,64 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
                   Icon(Icons.bolt, color: AppColors.primaryTeal, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    'ARRIVING IN SECONDS',
-                    style: AppTheme.bodyStyle(
-                      fontSize: 12,
-                      color: AppColors.primaryTeal,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    'VIA $routeName • ARRIVING IN $eta',
+                    style: AppTheme.bodyStyle(fontSize: 12, color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
-              
+
               const Spacer(),
-              
-              // Method Selector
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.primaryTeal.withValues(alpha: 0.1)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text('Bank', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const Text('transfer', style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('Free of charge', style: TextStyle(fontSize: 10, color: Colors.grey[600])),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryCoral.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text(
-                              'SAVES £1.75',
-                              style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
+
+              // Method Selector — show routes from API
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else
+                Row(
+                  children: [
+                    _buildRouteOption(
+                      label: routeName,
+                      subtitle: '${feePct.toStringAsFixed(1)}% fee',
+                      saveText: feePct < 1 ? 'SAVES 90%' : null,
+                      selected: true,
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          Text('Debit card', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700])),
-                          const SizedBox(height: 4),
-                          Text('£1.75 provider fee', style: TextStyle(fontSize: 10, color: Colors.grey[500])),
-                          const SizedBox(height: 12),
-                          const SizedBox(height: 18), // Spacer to match height
-                        ],
-                      ),
+                    const SizedBox(width: 16),
+                    _buildRouteOption(
+                      label: 'MTO',
+                      subtitle: '7.5% fee',
+                      selected: false,
                     ),
-                  ),
-                ],
-              ),
-              
+                  ],
+                ),
+
               const SizedBox(height: 32),
-              
+
               // Swipe Button
-              _buildSwipeButton(),
-              
+              SwipeToSendButton(
+                text: '→ Swipe to send \$${amount.toStringAsFixed(0)}',
+                onCompleted: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProcessingTransferScreen(
+                        recipientName: widget.recipientName,
+                        amount: amount.toStringAsFixed(0),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.lock_outline, color: Colors.grey[400], size: 14),
                   const SizedBox(width: 4),
-                  Text(
-                    'SECURE END-TO-END ENCRYPTED TRANSFER',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[400],
-                      letterSpacing: 0.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('SECURE END-TO-END ENCRYPTED TRANSFER',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[400], letterSpacing: 0.5, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 24),
@@ -222,20 +226,43 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
     );
   }
 
-  Widget _buildSwipeButton() {
-    return SwipeToSendButton(
-      text: '→ Swipe to send £$_amount',
-      onCompleted: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProcessingTransferScreen(
-              recipientName: widget.recipientName,
-              amount: _amount,
-            ),
-          ),
-        );
-      },
+  Widget _buildRouteOption({
+    required String label,
+    required String subtitle,
+    String? saveText,
+    required bool selected,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.grey[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? AppColors.primaryTeal.withValues(alpha: 0.1) : Colors.transparent),
+          boxShadow: selected
+              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10)]
+              : null,
+        ),
+        child: Column(
+          children: [
+            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? AppColors.kinInk : Colors.grey[700])),
+            const SizedBox(height: 4),
+            Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+            if (saveText != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryCoral.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(saveText, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+              ),
+            ] else
+              const SizedBox(height: 18),
+          ],
+        ),
+      ),
     );
   }
 }

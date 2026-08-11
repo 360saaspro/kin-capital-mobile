@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../services/app_config.dart';
 import '../main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? entityId;
+  const LoginScreen({super.key, this.entityId});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -12,6 +14,19 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
+  final _entityController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _entityController.text = widget.entityId ?? AppConfig().entityId;
+  }
+
+  @override
+  void dispose() {
+    _entityController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,47 +47,42 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-              Text(
-                'Welcome back',
-                style: AppTheme.headingStyle(fontSize: 32),
-              ),
+              Text('Welcome back', style: AppTheme.headingStyle(fontSize: 32)),
               const SizedBox(height: 12),
               Text(
                 'Log in to your Kin account to continue your financial journey.',
                 style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               const SizedBox(height: 48),
-              
-              _buildLabel('Email Address'),
-              _buildTextField('camille@kin.app', Icons.email_outlined),
-              
+
+              _buildLabel('Entity ID (Demo)'),
+              _buildTextField(_entityController, 'maria_trader_sps_001', Icons.badge_outlined),
+
               const SizedBox(height: 24),
-              
+
               _buildLabel('Password'),
               _buildPasswordField(),
-              
+
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {},
-                  child: Text(
-                    'Forgot Password?',
-                    style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
-                  ),
+                  child: Text('Forgot Password?',
+                      style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
                 ),
               ),
-              
+
               const SizedBox(height: 40),
-              
+
               SizedBox(
-                width: double.infinity,
-                height: 60,
+                width: double.infinity, height: 60,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Navigate to Main Dashboard
+                    final eid = _entityController.text.trim();
+                    if (eid.isNotEmpty) AppConfig().entityId = eid;
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => const MainScreen()),
+                      MaterialPageRoute(builder: (_) => const MainScreen()),
                       (route) => false,
                     );
                   },
@@ -80,43 +90,40 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    width: 60,
-                    height: 1,
-                    color: Colors.grey[300],
-                  ),
+                  Container(width: 60, height: 1, color: Colors.grey[300]),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text('OR', style: TextStyle(color: Colors.grey[400], fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
-                  Container(
-                    width: 60,
-                    height: 1,
-                    color: Colors.grey[300],
-                  ),
+                  Container(width: 60, height: 1, color: Colors.grey[300]),
                 ],
               ),
-              
+
               const SizedBox(height: 24),
-              
+
               Center(
                 child: Column(
                   children: [
                     IconButton(
                       icon: const Icon(Icons.face, size: 48, color: AppColors.primaryTeal),
-                      onPressed: () {},
+                      onPressed: () {
+                        // Skip straight to demo with default entity
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MainScreen()),
+                          (route) => false,
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Tap to use Face ID',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
+                    Text('Tap to use Face ID',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -130,20 +137,18 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildLabel(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(
-        label,
-        style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 14),
-      ),
+      child: Text(label, style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 14)),
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon) {
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.kinMistLight.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextField(
+        controller: controller,
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, color: Colors.grey[400]),
