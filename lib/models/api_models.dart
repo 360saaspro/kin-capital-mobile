@@ -167,6 +167,31 @@ class AuditResponse {
       );
 }
 
+class KycSubmitResponse {
+  final String entityId;
+  final String kycStatus;
+  final bool sanctionsMatch;
+  final List<String> checks;
+  final List<String> flags;
+  final String status;
+  KycSubmitResponse({
+    required this.entityId,
+    required this.kycStatus,
+    required this.sanctionsMatch,
+    required this.checks,
+    required this.flags,
+    required this.status,
+  });
+  factory KycSubmitResponse.fromJson(Map<String, dynamic> j) => KycSubmitResponse(
+        entityId: j['entity_id'] as String? ?? '',
+        kycStatus: j['kyc_status'] as String? ?? 'pending',
+        sanctionsMatch: j['sanctions_match'] as bool? ?? false,
+        checks: (j['checks'] as List<dynamic>?)?.map((c) => c.toString()).toList() ?? [],
+        flags: (j['flags'] as List<dynamic>?)?.map((f) => f.toString()).toList() ?? [],
+        status: j['status'] as String? ?? 'PENDING_REVIEW',
+      );
+}
+
 class OrchestrationResult {
   final String entityId;
   final String intent;
