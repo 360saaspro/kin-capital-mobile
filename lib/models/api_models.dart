@@ -224,4 +224,4 @@ class KycSubmitResult {
         flags: (j['flags'] as List<dynamic>?)?.map((f) => f.toString()).toList() ?? [],
         status: j['status'] as String? ?? 'PASSED',
       );
-}
+}

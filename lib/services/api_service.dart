@@ -268,6 +268,34 @@ class ApiService {
     return AuditResponse.fromJson(d);
   }
 
+  /// POST /kyc-submit — submit KYC identity for verification
+  Future<KycSubmitResponse> kycSubmit({
+    required String entityId,
+    required String fullName,
+    required String email,
+    String phone = '',
+    required String dateOfBirth,
+    required String nationality,
+    required String identityType,
+    required String identityNumber,
+    required String address,
+    required String countryOfResidence,
+  }) async {
+    final d = await _post('/kyc-submit', {
+      'entity_id': entityId,
+      'full_name': fullName,
+      'email': email,
+      'phone': phone,
+      'date_of_birth': dateOfBirth,
+      'nationality': nationality,
+      'identity_type': identityType,
+      'identity_number': identityNumber,
+      'address': address,
+      'country_of_residence': countryOfResidence,
+    });
+    return KycSubmitResponse.fromJson(d);
+  }
+
   /// POST /orchestrate — full agentic loop (perceive → reason → plan → act → reflect)
   Future<OrchestrationResult> orchestrate(String entityId, {String intent = 'assess credit worthiness'}) async {
     final d = await _post('/orchestrate', {

@@ -64,23 +64,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
         email: email,
         password: password,
         fullName: name,
-        phone: phone.isNotEmpty ? phone : '+1 (876) 123-4567',
+        phone: phone,
       );
 
       if (mounted) {
-        setState(() => _isLoading = false);
-        Navigator.push(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const BiometricSetupScreen()),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const BiometricSetupScreen()),
-        );
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isLoading = false;
+        });
       }
     }
   }
@@ -93,7 +91,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.kinInk),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.kinInk),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -113,15 +111,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 'Join thousands of people across the Caribbean managing their money with Kin.',
                 style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600]),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
 
               if (_errorMessage != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
                     color: AppColors.primaryCoral.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primaryCoral.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -136,18 +134,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
               ],
-              
+
               _buildLabel('Full Name'),
               _buildTextField(_nameController, 'e.g. Camille Stevenson', Icons.person_outline),
-              
+
               const SizedBox(height: 20),
-              
+
               _buildLabel('Email Address'),
               _buildTextField(_emailController, 'e.g. camille@kin.app', Icons.email_outlined),
-              
+
               const SizedBox(height: 20),
-              
+
               _buildLabel('Phone Number'),
               _buildTextField(_phoneController, 'e.g. +1 (876) 123-4567', Icons.phone_outlined),
 
@@ -155,13 +154,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
               _buildLabel('Password'),
               _buildPasswordField(),
-              
+
               const SizedBox(height: 32),
-              
+
               _buildTermsCheckbox(),
-              
+
               const SizedBox(height: 40),
-              
+
               SizedBox(
                 width: double.infinity,
                 height: 60,
@@ -199,55 +198,41 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildLabel(String label) {
+  Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Text(
-        label,
-        style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        text,
+        style: AppTheme.labelStyle(color: Colors.grey[700]),
       ),
     );
   }
 
   Widget _buildTextField(TextEditingController controller, String hint, IconData icon) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.kinMistLight.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          hintText: hint,
-          prefixIcon: Icon(icon, color: Colors.grey[400]),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        ),
+    return TextField(
+      controller: controller,
+      style: AppTheme.bodyStyle(fontSize: 16),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, color: AppColors.primaryTeal),
       ),
     );
   }
 
   Widget _buildPasswordField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.kinMistLight.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: TextField(
-        controller: _passwordController,
-        obscureText: _obscurePassword,
-        decoration: InputDecoration(
-          hintText: 'At least 6 characters',
-          prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[400]),
-          suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-              color: Colors.grey[400],
-            ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+    return TextField(
+      controller: _passwordController,
+      obscureText: _obscurePassword,
+      style: AppTheme.bodyStyle(fontSize: 16),
+      decoration: InputDecoration(
+        hintText: 'Minimum 6 characters',
+        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryTeal),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: Colors.grey,
           ),
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
       ),
     );
@@ -275,12 +260,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 TextSpan(text: 'By signing up, I agree to the '),
                 TextSpan(
                   text: 'Terms of Service',
-                  style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
                 ),
                 TextSpan(text: ' and '),
                 TextSpan(
                   text: 'Privacy Policy',
-                  style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
