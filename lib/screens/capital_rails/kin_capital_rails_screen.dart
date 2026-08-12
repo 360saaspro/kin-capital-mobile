@@ -33,7 +33,10 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         _api.creditOffer(widget.entityId, requestedAmount: 50000),
@@ -51,44 +54,50 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color.fromARGB(255, 245, 251, 248),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text('Kin Capital Rails', style: AppTheme.headingStyle(fontSize: 18)),
+        title: Text(
+          'Kin Capital Rails',
+          style: AppTheme.headingStyle(fontSize: 18),
+        ),
         centerTitle: true,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? _buildError()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildCreditScoreCard(),
-                        const SizedBox(height: 20),
-                        _buildRiskFactorsCard(),
-                        const SizedBox(height: 20),
-                        _buildRouteCard(),
-                        const SizedBox(height: 20),
-                        _buildOrchestrateButton(),
-                        const SizedBox(height: 40),
-                      ],
-                    ),
-                  ),
+          ? _buildError()
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCreditScoreCard(),
+                    const SizedBox(height: 20),
+                    _buildRiskFactorsCard(),
+                    const SizedBox(height: 20),
+                    _buildRouteCard(),
+                    const SizedBox(height: 20),
+                    _buildOrchestrateButton(),
+                    const SizedBox(height: 40),
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -101,21 +110,33 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48, color: AppColors.kinCoral),
             const SizedBox(height: 16),
-            Text('Could not connect to Kin Capital Rails API',
-                style: AppTheme.bodyStyle(fontSize: 16),
-                textAlign: TextAlign.center),
+            Text(
+              'Could not connect to Kin Capital Rails API',
+              style: AppTheme.bodyStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(fontSize: 12, color: Colors.grey),
-                textAlign: TextAlign.center),
+            Text(
+              _error!,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: const Color.from(
+                  alpha: 1,
+                  red: 0,
+                  green: 0.416,
+                  blue: 0.38,
+                ),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
             ),
           ],
@@ -133,7 +154,11 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
         gradient: AppColors.primaryGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8)),
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
@@ -142,15 +167,28 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Cash-Flow Credit Score', style: AppTheme.bodyStyle(color: Colors.white70, fontSize: 14)),
+              Text(
+                'Cash-Flow Credit Score',
+                style: AppTheme.bodyStyle(color: Colors.white70, fontSize: 14),
+              ),
               if (c.escalated)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.kinCoral,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text('ESCALATED', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'ESCALATED',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -159,10 +197,20 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(c.creditScore.toStringAsFixed(0),
-                  style: const TextStyle(color: Colors.white, fontSize: 48, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+              Text(
+                c.creditScore.toStringAsFixed(0),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                ),
+              ),
               const SizedBox(width: 8),
-              const Text('/ 850', style: TextStyle(color: Colors.white54, fontSize: 18)),
+              const Text(
+                '/ 850',
+                style: TextStyle(color: Colors.white54, fontSize: 18),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -176,10 +224,23 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Text('Recommended limit: \$${c.recommendedLimit.toStringAsFixed(0)}',
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            'Recommended limit: \$${c.recommendedLimit.toStringAsFixed(0)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(c.explanation, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+          Text(
+            c.explanation,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
           if (c.escalated && c.escalationReason.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -192,7 +253,12 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
                 children: [
                   const Icon(Icons.warning, color: Colors.white, size: 16),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(c.escalationReason, style: const TextStyle(color: Colors.white, fontSize: 11))),
+                  Expanded(
+                    child: Text(
+                      c.escalationReason,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -210,7 +276,11 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -219,21 +289,31 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Risk Assessment', style: AppTheme.headingStyle(fontSize: 18)),
+              Text(
+                'Risk Assessment',
+                style: AppTheme.headingStyle(fontSize: 18),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: r.riskScore < 0.3
                       ? Colors.green.withValues(alpha: 0.1)
                       : r.riskScore < 0.6
-                          ? Colors.orange.withValues(alpha: 0.1)
-                          : Colors.red.withValues(alpha: 0.1),
+                      ? Colors.orange.withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${(r.riskScore * 100).toStringAsFixed(0)}%',
                   style: TextStyle(
-                    color: r.riskScore < 0.3 ? Colors.green : r.riskScore < 0.6 ? Colors.orange : Colors.red,
+                    color: r.riskScore < 0.3
+                        ? Colors.green
+                        : r.riskScore < 0.6
+                        ? Colors.orange
+                        : Colors.red,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -242,23 +322,40 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Model: ${r.modelVersion}', style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey)),
+          Text(
+            'Model: ${r.modelVersion}',
+            style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
+          ),
           const SizedBox(height: 12),
-          ...r.features.entries.take(5).map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Icon(Icons.circle, size: 8, color: AppColors.primaryTeal),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(_featureLabel(e.key),
-                          style: AppTheme.bodyStyle(fontSize: 13, color: AppColors.kinDeep)),
-                    ),
-                    Text((e.value as num).toStringAsFixed(4),
-                        style: AppTheme.dataStyle(fontSize: 12, color: Colors.grey[600])),
-                  ],
+          ...r.features.entries
+              .take(5)
+              .map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.circle, size: 8, color: AppColors.primaryTeal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _featureLabel(e.key),
+                          style: AppTheme.bodyStyle(
+                            fontSize: 13,
+                            color: AppColors.kinDeep,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        (e.value as num).toStringAsFixed(4),
+                        style: AppTheme.dataStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              )),
+              ),
         ],
       ),
     );
@@ -284,7 +381,11 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -293,9 +394,15 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Cheapest Route', style: AppTheme.headingStyle(fontSize: 18)),
+              Text(
+                'Cheapest Route',
+                style: AppTheme.headingStyle(fontSize: 18),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -305,8 +412,14 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
                   children: [
                     const Icon(Icons.bolt, size: 14, color: Colors.green),
                     const SizedBox(width: 4),
-                    Text('${r.feePct.toStringAsFixed(1)}%',
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      '${r.feePct.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -317,7 +430,12 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
             children: [
               const Icon(Icons.route, size: 20, color: AppColors.primaryTeal),
               const SizedBox(width: 8),
-              Expanded(child: Text(r.selectedRoute, style: AppTheme.bodyStyle(fontWeight: FontWeight.w600))),
+              Expanded(
+                child: Text(
+                  r.selectedRoute,
+                  style: AppTheme.bodyStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -331,19 +449,41 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           ),
           if (r.alternatives.isNotEmpty) ...[
             const Divider(height: 32),
-            Text('Alternatives', style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey)),
+            Text(
+              'Alternatives',
+              style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
+            ),
             const SizedBox(height: 8),
-            ...r.alternatives.take(3).map((a) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.swap_horiz, size: 16, color: Colors.grey),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(a['route']?.toString() ?? '', style: const TextStyle(fontSize: 12))),
-                      Text('${a['fee_pct']}%', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
+            ...r.alternatives
+                .take(3)
+                .map(
+                  (a) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.swap_horiz,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            a['route']?.toString() ?? '',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        Text(
+                          '${a['fee_pct']}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                )),
+                ),
           ],
         ],
       ),
@@ -354,9 +494,15 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey)),
+        Text(
+          label,
+          style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: AppTheme.dataStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(
+          value,
+          style: AppTheme.dataStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
       ],
     );
   }
@@ -379,33 +525,59 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (result.llmReasoning != null) ...[
-                        Text('Reasoning:', style: AppTheme.bodyStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          'Reasoning:',
+                          style: AppTheme.bodyStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Text(result.llmReasoning!, style: const TextStyle(fontSize: 12)),
+                        Text(
+                          result.llmReasoning!,
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         const SizedBox(height: 16),
                       ],
-                      Text('Plan:', style: AppTheme.bodyStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Plan:',
+                        style: AppTheme.bodyStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
-                      ...result.plan.map((p) => Text('• $p', style: const TextStyle(fontSize: 12))),
+                      ...result.plan.map(
+                        (p) =>
+                            Text('• $p', style: const TextStyle(fontSize: 12)),
+                      ),
                     ],
                   ),
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
+                  ),
                 ],
               ),
             );
           } catch (e) {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Orchestration failed: $e')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Orchestration failed: $e')));
           }
         },
         icon: const Icon(Icons.psychology, color: AppColors.primaryTeal),
-        label: const Text('Run Full Orchestration',
-            style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Run Full Orchestration',
+          style: TextStyle(
+            color: AppColors.primaryTeal,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.primaryTeal),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
+import '../send/recipients_screen.dart';
 
 class TopUpSuccessScreen extends StatelessWidget {
-  const TopUpSuccessScreen({super.key});
+  final double amount;
+  const TopUpSuccessScreen({super.key, this.amount = 500.0});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +27,7 @@ class TopUpSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '£500.00 is now ready to send or\nspend.',
+                '£${amount.toStringAsFixed(2)} is now ready to send or\nspend.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
               ),
@@ -64,61 +68,67 @@ class TopUpSuccessScreen extends StatelessWidget {
   }
 
   Widget _buildBalanceCard() {
-    return Container(
-      width: double.infinity,
-      height: 180,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primaryTeal, Color(0xFFE27D60)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: Offset(0, 10))],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Icon(Icons.account_balance_wallet, color: Colors.white.withValues(alpha: 0.8), size: 32),
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
+      builder: (context, snapshot) {
+        final bal = (snapshot.data?['balance'] as num?)?.toDouble() ?? 2950.50;
+        return Container(
+          width: double.infinity,
+          height: 180,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primaryTeal, Color(0xFFE27D60)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10))],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text('KIN PREMIUM', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Icon(Icons.account_balance_wallet, color: Colors.white.withValues(alpha: 0.8), size: 32),
               ),
-              const SizedBox(height: 20),
-              Text('New Total Balance', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('£', style: AppTheme.headingStyle(fontSize: 24, color: Colors.white)),
-                  const SizedBox(width: 4),
-                  Text('4,820.45', style: AppTheme.headingStyle(fontSize: 48, color: Colors.white)),
-                ],
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 16),
-                  const SizedBox(width: 4),
-                  Text('kin', style: AppTheme.headingStyle(fontSize: 16, color: Colors.white)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('KIN PREMIUM', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 20),
+                  Text('New Total Balance', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text('£', style: AppTheme.headingStyle(fontSize: 24, color: Colors.white)),
+                      const SizedBox(width: 4),
+                      Text(bal.toStringAsFixed(2), style: AppTheme.headingStyle(fontSize: 40, color: Colors.white)),
+                    ],
+                  ),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      const Icon(Icons.account_balance_wallet_outlined, color: Colors.white, size: 16),
+                      const SizedBox(width: 4),
+                      Text('kin', style: AppTheme.headingStyle(fontSize: 16, color: Colors.white)),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -133,11 +143,16 @@ class TopUpSuccessScreen extends StatelessWidget {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             elevation: 0,
           ),
-          child: Text('Done'),
+          child: const Text('Done', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
         ),
         const SizedBox(height: 16),
         OutlinedButton(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RecipientsScreen()),
+            );
+          },
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(double.infinity, 56),
             side: BorderSide(color: AppColors.primaryTeal.withValues(alpha: 0.5)),
@@ -145,10 +160,10 @@ class TopUpSuccessScreen extends StatelessWidget {
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+            children: const [
               Text('Send money now', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_forward, color: AppColors.primaryTeal, size: 18),
+              SizedBox(width: 8),
+              Icon(Icons.arrow_forward, color: AppColors.primaryTeal, size: 18),
             ],
           ),
         ),

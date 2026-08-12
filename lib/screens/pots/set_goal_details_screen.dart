@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
 
 class SetGoalDetailsScreen extends StatefulWidget {
   const SetGoalDetailsScreen({super.key});
@@ -11,6 +13,42 @@ class SetGoalDetailsScreen extends StatefulWidget {
 
 class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
   final TextEditingController _amountController = TextEditingController(text: '500');
+  bool _isLoading = false;
+
+  Future<void> _handleCreatePot() async {
+    final target = double.tryParse(_amountController.text.replaceAll(',', '')) ?? 500.0;
+    setState(() => _isLoading = true);
+
+    try {
+      final uid = AuthService.instance.currentUid;
+      final potId = 'pot_${DateTime.now().millisecondsSinceEpoch}';
+
+      await FirestoreService.instance.createOrUpdatePot(uid, potId, {
+        'title': 'Island Holiday',
+        'targetAmount': target,
+        'savedAmount': 0.0,
+        'color': 'teal',
+        'icon': 'beach_access',
+        'status': 'Active',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Yard Pot created successfully!'),
+            backgroundColor: AppColors.primaryTeal,
+          ),
+        );
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,9 +99,9 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
             const SizedBox(height: 16),
             Center(
               child: TextButton(
-                onPressed: () {},
+                onPressed: () => Navigator.pop(context),
                 child: Text(
-                  'Save as Draft',
+                  'Cancel',
                   style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
                 ),
               ),
@@ -108,7 +146,7 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.umbrella, color: Colors.white, size: 28),
+                  const Icon(Icons.umbrella, color: Colors.white, size: 28),
                   const SizedBox(width: 12),
                   Text(
                     'Island Holiday',
@@ -147,7 +185,7 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   style: AppTheme.headingStyle(fontSize: 32, color: AppColors.kinInk),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     border: InputBorder.none,
                     isDense: true,
                   ),
@@ -189,7 +227,7 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
                 style: TextStyle(color: Colors.grey[400], fontSize: 16),
               ),
               const Spacer(),
-              Icon(Icons.keyboard_arrow_down, color: AppColors.primaryTeal),
+              const Icon(Icons.keyboard_arrow_down, color: AppColors.primaryTeal),
             ],
           ),
         ),
@@ -203,7 +241,7 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: Offset(0, 10))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 20, offset: const Offset(0, 10))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +269,7 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Round-ups', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      const Text('Round-ups', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       Text('ON', style: AppTheme.headingStyle(fontSize: 16, color: AppColors.primaryTeal)),
                     ],
                   ),
@@ -249,13 +287,13 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
           const SizedBox(height: 20),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            children: const [
               Icon(Icons.info_outline, color: AppColors.primaryTeal, size: 18),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Based on your spending, this multiplier will help you reach your £500 goal by August 2024.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600], height: 1.5),
+                  'Based on your spending, this multiplier will help you reach your goal efficiently.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
                 ),
               ),
             ],
@@ -267,16 +305,16 @@ class _SetGoalDetailsScreenState extends State<SetGoalDetailsScreen> {
 
   Widget _buildCreateButton() {
     return ElevatedButton(
-      onPressed: () {
-        Navigator.popUntil(context, (route) => route.isFirst);
-      },
+      onPressed: _isLoading ? null : _handleCreatePot,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryTeal,
         minimumSize: const Size(double.infinity, 56),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 0,
       ),
-      child: Text('Create Pot'),
+      child: _isLoading
+          ? const CircularProgressIndicator(color: Colors.white)
+          : const Text('Create Pot', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
     );
   }
 }

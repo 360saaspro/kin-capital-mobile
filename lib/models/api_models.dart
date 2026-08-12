@@ -194,3 +194,34 @@ class OrchestrationResult {
         reflection: j['reflection'] as Map<String, dynamic>?,
       );
 }
+
+class KycSubmitResult {
+  final String entityId;
+  final String kycStatus; // verified | pending | flagged
+  final bool sanctionsMatch;
+  final List<String> checks;
+  final List<String> flags;
+  final String status; // PASSED | PENDING_REVIEW | FLAGGED
+
+  KycSubmitResult({
+    required this.entityId,
+    required this.kycStatus,
+    required this.sanctionsMatch,
+    required this.checks,
+    required this.flags,
+    required this.status,
+  });
+
+  bool get isPassed => status == 'PASSED' || kycStatus == 'verified';
+  bool get isPending => status == 'PENDING_REVIEW' || kycStatus == 'pending';
+  bool get isFlagged => status == 'FLAGGED' || kycStatus == 'flagged' || sanctionsMatch;
+
+  factory KycSubmitResult.fromJson(Map<String, dynamic> j) => KycSubmitResult(
+        entityId: j['entity_id'] as String? ?? '',
+        kycStatus: j['kyc_status'] as String? ?? 'verified',
+        sanctionsMatch: j['sanctions_match'] as bool? ?? false,
+        checks: (j['checks'] as List<dynamic>?)?.map((c) => c.toString()).toList() ?? [],
+        flags: (j['flags'] as List<dynamic>?)?.map((f) => f.toString()).toList() ?? [],
+        status: j['status'] as String? ?? 'PASSED',
+      );
+}

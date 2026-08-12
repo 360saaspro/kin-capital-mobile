@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/branded_background.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
 
 class CardManagementScreen extends StatefulWidget {
   const CardManagementScreen({super.key});
@@ -13,6 +15,33 @@ class CardManagementScreen extends StatefulWidget {
 class _CardManagementScreenState extends State<CardManagementScreen> {
   bool isFrozen = false;
   bool showDetails = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCardSettings();
+  }
+
+  Future<void> _loadCardSettings() async {
+    try {
+      final uid = AuthService.instance.currentUid;
+      final profile = await FirestoreService.instance.getUserProfile(uid);
+      if (profile != null && profile['cardIsFrozen'] != null && mounted) {
+        setState(() {
+          isFrozen = profile['cardIsFrozen'] == true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFreeze(bool val) async {
+    setState(() => isFrozen = val);
+    try {
+      final uid = AuthService.instance.currentUid;
+      await FirestoreService.instance.setUserProfile(uid, {'cardIsFrozen': val});
+      await FirestoreService.instance.updateCardSettings(uid, 'card_001', {'isFrozen': val});
+    } catch (_) {}
+  }
 
   void _showPin() {
     showDialog(
@@ -32,7 +61,7 @@ class _CardManagementScreenState extends State<CardManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+            child: const Text('Close', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -71,7 +100,7 @@ class _CardManagementScreenState extends State<CardManagementScreen> {
                 title: 'Freeze Card',
                 subtitle: 'Lost your card? Freeze it instantly to prevent unauthorized transactions.',
                 value: isFrozen,
-                onChanged: (val) => setState(() => isFrozen = val),
+                onChanged: _toggleFreeze,
               ),
               const SizedBox(height: 12),
               _buildActionItem(
@@ -92,7 +121,11 @@ class _CardManagementScreenState extends State<CardManagementScreen> {
                 icon: Icons.sync_problem,
                 title: 'Replace Card',
                 subtitle: 'Damaged or stolen? Order a new one.',
-                onTap: () {},
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Card replacement request logged.')),
+                  );
+                },
               ),
               const SizedBox(height: 40),
             ],
@@ -122,7 +155,7 @@ class _CardManagementScreenState extends State<CardManagementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Junior\'s card is on its way to Kingston 🇯🇲',
                   style: TextStyle(color: AppColors.kinInk, fontWeight: FontWeight.bold, fontSize: 14),
                 ),
@@ -170,7 +203,7 @@ class _CardManagementScreenState extends State<CardManagementScreen> {
                 children: [
                   const Icon(Icons.eco, color: Colors.amber, size: 20),
                   const Spacer(),
-                  Text('•••• 8840', style: AppTheme.dataStyle(color: Colors.white, fontSize: 16)),
+                  Text(showDetails ? '4111 2222 3333 8840' : '•••• 8840', style: AppTheme.dataStyle(color: Colors.white, fontSize: 16)),
                 ],
               ),
             ),

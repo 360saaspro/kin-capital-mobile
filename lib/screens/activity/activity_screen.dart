@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
+import 'transaction_detail_screen.dart';
 
-class ActivityScreen extends StatelessWidget {
+class ActivityScreen extends StatefulWidget {
   const ActivityScreen({super.key});
+
+  @override
+  State<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends State<ActivityScreen> {
+  String _selectedFilter = 'All';
 
   @override
   Widget build(BuildContext context) {
@@ -15,15 +25,16 @@ class ActivityScreen extends StatelessWidget {
             backgroundColor: AppColors.kinMistLight,
             elevation: 0,
             pinned: true,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 16),
-              child: const CircleAvatar(
+            leading: const Padding(
+              padding: EdgeInsets.only(left: 16),
+              child: CircleAvatar(
                 radius: 18,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=maya'),
+                backgroundColor: AppColors.primaryTeal,
+                child: Icon(Icons.person, color: Colors.white, size: 20),
               ),
             ),
             title: Text(
-              'Good morning',
+              'Activity',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.bold,
@@ -44,10 +55,11 @@ class ActivityScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 16),
                   Text(
-                    'Activity',
+                    'Activity History',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primary,
+                          fontSize: 28,
                         ),
                   ),
                   const SizedBox(height: 24),
@@ -57,13 +69,13 @@ class ActivityScreen extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildFilterChip(context, 'All', true),
+                        _buildFilterChip('All'),
                         const SizedBox(width: 8),
-                        _buildFilterChip(context, 'Sent', false),
+                        _buildFilterChip('deposit'),
                         const SizedBox(width: 8),
-                        _buildFilterChip(context, 'Received', false),
+                        _buildFilterChip('transfer'),
                         const SizedBox(width: 8),
-                        _buildFilterChip(context, 'Spent', false),
+                        _buildFilterChip('card'),
                       ],
                     ),
                   ),
@@ -71,7 +83,7 @@ class ActivityScreen extends StatelessWidget {
                   
                   // Promo Card
                   Container(
-                    height: 160,
+                    height: 140,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: AppColors.cardGradient,
@@ -85,7 +97,7 @@ class ActivityScreen extends StatelessWidget {
                         const Text(
                           'kin',
                           style: TextStyle(
-                            fontSize: 48,
+                            fontSize: 36,
                             fontWeight: FontWeight.w900,
                             color: AppColors.kinDeep,
                             letterSpacing: -2,
@@ -98,64 +110,59 @@ class ActivityScreen extends StatelessWidget {
                                 color: AppColors.kinDeep,
                               ),
                         ),
-                        Text(
-                          'On your Kin savings vault',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.kinDeep.withValues(alpha: 0.7),
-                              ),
-                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 32),
                   
                   Text(
-                    'Today',
+                    'Recent Transactions',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.kinInk.withValues(alpha: 0.5),
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   const SizedBox(height: 16),
-                  _buildTransactionItem(
-                    context,
-                    title: 'Starbucks Coffee',
-                    time: '08:45 AM • Spent',
-                    amount: '- \$6.50',
-                    icon: Icons.coffee_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTransactionItem(
-                    context,
-                    title: 'Salary Deposit',
-                    time: '09:00 AM • Received',
-                    amount: '+ \$4,250.00',
-                    icon: Icons.account_balance_wallet_outlined,
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  Text(
-                    'Yesterday',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.kinInk.withValues(alpha: 0.5),
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTransactionItem(
-                    context,
-                    title: 'Amazon.com',
-                    time: '04:20 PM • Spent',
-                    amount: '- \$142.99',
-                    icon: Icons.shopping_bag_outlined,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTransactionItem(
-                    context,
-                    title: 'Monthly Rent',
-                    time: '01:00 PM • Sent',
-                    amount: '- \$2,100.00',
-                    icon: Icons.home_outlined,
+
+                  StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: FirestoreService.instance.streamUserTransactions(AuthService.instance.currentUid),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return _buildMockTransactions();
+                      }
+
+                      final items = snapshot.data ?? [];
+                      final filteredItems = items.where((item) {
+                        if (_selectedFilter == 'All') return true;
+                        final type = (item['type'] ?? '').toString().toLowerCase();
+                        return type == _selectedFilter.toLowerCase();
+                      }).toList();
+
+                      if (filteredItems.isEmpty) {
+                        return _buildMockTransactions();
+                      }
+
+                      return Column(
+                        children: filteredItems.map((tx) {
+                          final title = tx['title'] ?? 'Transaction';
+                          final amt = (tx['amount'] as num?)?.toDouble() ?? 0.0;
+                          final type = tx['type'] ?? 'payment';
+                          final isNegative = amt < 0;
+                          final amountText = isNegative ? '- £${amt.abs().toStringAsFixed(2)}' : '+ £${amt.toStringAsFixed(2)}';
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildTransactionItem(
+                              context,
+                              title: title,
+                              time: '$type • Processed',
+                              amount: amountText,
+                              icon: isNegative ? Icons.send_outlined : Icons.add_circle_outline,
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
                   ),
                   const SizedBox(height: 100),
                 ],
@@ -167,18 +174,45 @@ class ActivityScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFilterChip(BuildContext context, String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.primary : AppColors.kinMist,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : AppColors.kinInk.withValues(alpha: 0.6),
-          fontWeight: FontWeight.bold,
+  Widget _buildMockTransactions() {
+    return Column(
+      children: [
+        _buildTransactionItem(
+          context,
+          title: 'Top Up Deposit',
+          time: 'Today 10:45 AM • Received',
+          amount: '+ £250.00',
+          icon: Icons.add_circle_outline,
+        ),
+        const SizedBox(height: 12),
+        _buildTransactionItem(
+          context,
+          title: 'Camille Stevenson',
+          time: 'Yesterday 04:20 PM • Sent',
+          amount: '- £100.00',
+          icon: Icons.swap_horiz,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip(String label) {
+    final isSelected = _selectedFilter.toLowerCase() == label.toLowerCase();
+    return GestureDetector(
+      onTap: () => setState(() => _selectedFilter = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.kinMist,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.kinInk.withValues(alpha: 0.6),
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -192,53 +226,61 @@ class ActivityScreen extends StatelessWidget {
     required IconData icon,
   }) {
     final isNegative = amount.contains('-');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.kinMistLight,
-              shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TransactionDetailScreen()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.kinMistLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.kinInk.withValues(alpha: 0.5),
+                  Text(
+                    time,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.kinInk.withValues(alpha: 0.5),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            amount,
-            style: AppTheme.dataStyle(
-              color: isNegative ? AppColors.kinCoral : AppColors.primary,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+            Text(
+              amount,
+              style: AppTheme.dataStyle(
+                color: isNegative ? AppColors.kinCoral : AppColors.primary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

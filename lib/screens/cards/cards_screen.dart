@@ -397,17 +397,17 @@ class _CardsScreenState extends State<CardsScreen> {
                       // Spending Categories
                       Row(
                         children: [
-                          _buildCategoryItem('Groceries', '\$1,136', '40%', AppColors.primaryTeal),
-                          const Spacer(),
-                          _buildCategoryItem('Fuel', '\$710', '25%', Colors.red[800]!),
+                          Expanded(child: _buildCategoryItem('Groceries', '\$1,136', '40%', AppColors.primaryTeal)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildCategoryItem('Fuel', '\$710', '25%', Colors.red[800]!)),
                         ],
                       ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
-                          _buildCategoryItem('Bills', '\$568', '20%', Colors.brown[800]!),
-                          const Spacer(),
-                          _buildCategoryItem('Online', '\$426', '15%', const Color(0xFF1ABC9C)),
+                          Expanded(child: _buildCategoryItem('Bills', '\$568', '20%', Colors.brown[800]!)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildCategoryItem('Online', '\$426', '15%', const Color(0xFF1ABC9C))),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -500,7 +500,7 @@ class _CardsScreenState extends State<CardsScreen> {
           children: [
             Text(title, style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey)),
             Text(
-              '\$amount (\$percent)',
+              '$amount ($percent)',
               style: AppTheme.dataStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/auth_service.dart';
 import 'biometric_setup_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -11,6 +12,79 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  bool _agreedToTerms = true;
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleCreateAccount() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+
+    if (name.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your full name.');
+      return;
+    }
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _errorMessage = 'Please enter a valid email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'Password must be at least 6 characters.');
+      return;
+    }
+    if (!_agreedToTerms) {
+      setState(() => _errorMessage = 'Please accept the Terms of Service to proceed.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await AuthService.instance.signUp(
+        email: email,
+        password: password,
+        fullName: name,
+        phone: phone.isNotEmpty ? phone : '+1 (876) 123-4567',
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const BiometricSetupScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const BiometricSetupScreen()),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -39,20 +113,48 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 'Join thousands of people across the Caribbean managing their money with Kin.',
                 style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600]),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
+
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryCoral.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppColors.primaryCoral, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: AppColors.primaryCoral, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               
               _buildLabel('Full Name'),
-              _buildTextField('e.g. Camille Stevenson', Icons.person_outline),
+              _buildTextField(_nameController, 'e.g. Camille Stevenson', Icons.person_outline),
               
               const SizedBox(height: 20),
               
               _buildLabel('Email Address'),
-              _buildTextField('e.g. camille@kin.app', Icons.email_outlined),
+              _buildTextField(_emailController, 'e.g. camille@kin.app', Icons.email_outlined),
               
               const SizedBox(height: 20),
               
               _buildLabel('Phone Number'),
-              _buildTextField('e.g. +1 (876) 123-4567', Icons.phone_outlined),
+              _buildTextField(_phoneController, 'e.g. +1 (876) 123-4567', Icons.phone_outlined),
+
+              const SizedBox(height: 20),
+
+              _buildLabel('Password'),
+              _buildPasswordField(),
               
               const SizedBox(height: 32),
               
@@ -64,15 +166,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 width: double.infinity,
                 height: 60,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Navigate to Biometric Setup
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const BiometricSetupScreen()),
-                    );
-                  },
+                  onPressed: _isLoading ? null : _handleCreateAccount,
                   style: AppTheme.buttonStyle(backgroundColor: AppColors.primaryTeal),
-                  child: const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
               ),
               const SizedBox(height: 24),
@@ -82,8 +180,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: RichText(
                     text: TextSpan(
                       style: AppTheme.bodyStyle(color: Colors.grey[600]),
-                      children: [
-                        const TextSpan(text: 'Already have an account? '),
+                      children: const [
+                        TextSpan(text: 'Already have an account? '),
                         TextSpan(
                           text: 'Log in',
                           style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
@@ -111,16 +209,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildTextField(String hint, IconData icon) {
+  Widget _buildTextField(TextEditingController controller, String hint, IconData icon) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.kinMistLight.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextField(
+        controller: controller,
         decoration: InputDecoration(
           hintText: hint,
           prefixIcon: Icon(icon, color: Colors.grey[400]),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.kinMistLight.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: TextField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        decoration: InputDecoration(
+          hintText: 'At least 6 characters',
+          prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[400]),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              color: Colors.grey[400],
+            ),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
@@ -135,8 +260,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           width: 24,
           height: 24,
           child: Checkbox(
-            value: true,
-            onChanged: (v) {},
+            value: _agreedToTerms,
+            onChanged: (v) => setState(() => _agreedToTerms = v ?? false),
             activeColor: AppColors.primaryTeal,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           ),
@@ -146,13 +271,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: RichText(
             text: TextSpan(
               style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey[600]),
-              children: [
-                const TextSpan(text: 'By signing up, I agree to the '),
+              children: const [
+                TextSpan(text: 'By signing up, I agree to the '),
                 TextSpan(
                   text: 'Terms of Service',
                   style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' and '),
+                TextSpan(text: ' and '),
                 TextSpan(
                   text: 'Privacy Policy',
                   style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold),

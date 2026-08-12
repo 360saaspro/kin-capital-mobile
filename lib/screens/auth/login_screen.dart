@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/auth_service.dart';
 import '../../services/app_config.dart';
 import '../main_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? entityId;
@@ -14,18 +16,65 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
-  final _entityController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _entityController.text = widget.entityId ?? AppConfig().entityId;
+    if (widget.entityId != null && widget.entityId!.isNotEmpty) {
+      _emailController.text = widget.entityId!;
+    }
   }
 
   @override
   void dispose() {
-    _entityController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final input = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (input.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email address.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // If it looks like a standard email address, authenticate with Firebase Auth
+      if (input.contains('@')) {
+        await AuthService.instance.login(email: input, password: password.isNotEmpty ? password : 'Password123!');
+      } else {
+        // Fallback to Entity ID demo login
+        AppConfig().entityId = input;
+      }
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const MainScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString().replaceAll(RegExp(r'\[.*?\]'), '').trim();
+        });
+      }
+    }
   }
 
   @override
@@ -53,10 +102,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Log in to your Kin account to continue your financial journey.',
                 style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[600]),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
 
-              _buildLabel('Entity ID (Demo)'),
-              _buildTextField(_entityController, 'maria_trader_sps_001', Icons.badge_outlined),
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryCoral.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppColors.primaryCoral, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: AppColors.primaryCoral, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              _buildLabel('Email Address'),
+              _buildTextField(_emailController, 'e.g. camille@kin.app', Icons.email_outlined),
 
               const SizedBox(height: 24),
 
@@ -66,8 +138,13 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
-                  child: Text('Forgot Password?',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                    );
+                  },
+                  child: const Text('Forgot Password?',
                       style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
                 ),
               ),
@@ -75,19 +152,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 40),
 
               SizedBox(
-                width: double.infinity, height: 60,
+                width: double.infinity,
+                height: 60,
                 child: ElevatedButton(
-                  onPressed: () {
-                    final eid = _entityController.text.trim();
-                    if (eid.isNotEmpty) AppConfig().entityId = eid;
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MainScreen()),
-                      (route) => false,
-                    );
-                  },
+                  onPressed: _isLoading ? null : _handleLogin,
                   style: AppTheme.buttonStyle(backgroundColor: AppColors.primaryTeal),
-                  child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Login', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 ),
               ),
 
@@ -113,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     IconButton(
                       icon: const Icon(Icons.face, size: 48, color: AppColors.primaryTeal),
                       onPressed: () {
-                        // Skip straight to demo with default entity
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (_) => const MainScreen()),
@@ -166,6 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: TextField(
+        controller: _passwordController,
         obscureText: _obscurePassword,
         decoration: InputDecoration(
           hintText: '••••••••',

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
+import '../auth/onboarding_screen.dart';
 import 'security_center_screen.dart';
 import 'personal_details_screen.dart';
 import 'bank_accounts_screen.dart';
@@ -8,6 +11,17 @@ import '../home/receiver_home_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _handleLogout(BuildContext context) async {
+    await AuthService.instance.signOut();
+    if (context.mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
             _buildSettingsItem(Icons.privacy_tip_outlined, 'Privacy policy'),
             
             const SizedBox(height: 40),
-            _buildLogoutButton(),
+            _buildLogoutButton(context),
             const SizedBox(height: 32),
             _buildLegalDisclaimer(),
             const SizedBox(height: 40),
@@ -107,53 +121,62 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfileHeader() {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.bottomRight,
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
+      builder: (context, snapshot) {
+        final profile = snapshot.data;
+        final name = profile?['fullName'] ?? AuthService.instance.currentUser?.displayName ?? 'Camille Stevenson';
+        final email = profile?['email'] ?? AuthService.instance.currentUser?.email ?? 'camille@kin.app';
+
+        return Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange, Colors.red],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.white,
-                child: Text(
-                  'kin',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.kinInk,
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.orange, Colors.red],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      'kin',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.kinInk,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryTeal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.link, color: Colors.white, size: 16),
+                ),
+              ],
             ),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: const BoxDecoration(
-                color: AppColors.primaryTeal,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.link, color: Colors.white, size: 16),
+            const SizedBox(height: 16),
+            Text(
+              name,
+              style: AppTheme.headingStyle(fontSize: 24),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              email,
+              style: AppTheme.bodyStyle(color: Colors.grey, fontSize: 14),
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Camille Stevenson',
-          style: AppTheme.headingStyle(fontSize: 24),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Member since June 2024',
-          style: AppTheme.bodyStyle(color: Colors.grey, fontSize: 14),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -178,36 +201,38 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildSettingsItem(IconData icon, String title, {String? trailingText, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+      child: Material(
         color: AppColors.kinMistLight.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primaryTeal,
-            borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryTeal,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
-          child: Icon(icon, color: Colors.white, size: 20),
+          title: Text(
+            title,
+            style: AppTheme.bodyStyle(fontWeight: FontWeight.w500, fontSize: 15),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (trailingText != null) ...[
+                Text(
+                  trailingText,
+                  style: const TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+              ],
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+            ],
+          ),
+          onTap: onTap ?? () {},
         ),
-        title: Text(
-          title,
-          style: AppTheme.bodyStyle(fontWeight: FontWeight.w500, fontSize: 15),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (trailingText != null)
-              Text(
-                trailingText,
-                style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
-          ],
-        ),
-        onTap: onTap ?? () {},
       ),
     );
   }
@@ -215,35 +240,36 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildSettingsToggleItem(IconData icon, String title, bool value) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
+      child: Material(
         color: AppColors.kinMistLight.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.primaryTeal,
-            borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryTeal,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
           ),
-          child: Icon(icon, color: Colors.white, size: 20),
-        ),
-        title: Text(
-          title,
-          style: AppTheme.bodyStyle(fontWeight: FontWeight.w500, fontSize: 15),
-        ),
-        trailing: Switch.adaptive(
-          value: value,
-          onChanged: (v) {},
-          activeThumbColor: AppColors.primaryTeal,
+          title: Text(
+            title,
+            style: AppTheme.bodyStyle(fontWeight: FontWeight.w500, fontSize: 15),
+          ),
+          trailing: Switch.adaptive(
+            value: value,
+            onChanged: (v) {},
+            activeThumbColor: AppColors.primaryTeal,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(BuildContext context) {
     return TextButton.icon(
-      onPressed: () {},
+      onPressed: () => _handleLogout(context),
       icon: const Icon(Icons.logout, color: AppColors.primaryCoral, size: 20),
       label: const Text(
         'Log out',

@@ -5,6 +5,8 @@ import '../../core/widgets/swipe_to_send_button.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 import '../../services/app_config.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
 import 'processing_transfer_screen.dart';
 
 class SendAmountScreen extends StatefulWidget {
@@ -61,10 +63,44 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
       );
       if (mounted) setState(() => _route = route);
     } catch (_) {
-      // API offline — use best-effort data
       if (mounted) setState(() => _route = null);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleExecuteTransfer(double amount) async {
+    try {
+      final uid = AuthService.instance.currentUid;
+      // Deduct balance from Firestore
+      await FirestoreService.instance.updateUserBalance(uid, -amount);
+
+      // Record transfer transaction in Firestore
+      await FirestoreService.instance.addTransaction(
+        userId: uid,
+        amount: -amount,
+        type: 'transfer',
+        title: 'Transfer to ${widget.recipientName}',
+        metadata: {
+          'counterparty': widget.recipientName,
+          'status': 'Success',
+          'currency': 'USD/JMD',
+        },
+      );
+    } catch (e) {
+      // Fallback
+    }
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProcessingTransferScreen(
+            recipientName: widget.recipientName,
+            amount: amount.toStringAsFixed(0),
+          ),
+        ),
+      );
     }
   }
 
@@ -166,7 +202,7 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
 
               const Spacer(),
 
-              // Method Selector — show routes from API
+              // Method Selector
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.all(20),
@@ -195,17 +231,7 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
               // Swipe Button
               SwipeToSendButton(
                 text: '→ Swipe to send \$${amount.toStringAsFixed(0)}',
-                onCompleted: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProcessingTransferScreen(
-                        recipientName: widget.recipientName,
-                        amount: amount.toStringAsFixed(0),
-                      ),
-                    ),
-                  );
-                },
+                onCompleted: () => _handleExecuteTransfer(amount),
               ),
 
               const SizedBox(height: 16),

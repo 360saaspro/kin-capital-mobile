@@ -10,9 +10,12 @@ import '../activity/activity_screen.dart';
 import '../activity/transaction_detail_screen.dart';
 import '../capital_rails/kin_capital_rails_screen.dart';
 import '../pots/yard_pot_screen.dart';
+import '../pots/set_goal_identity_screen.dart';
 import '../send/recipients_screen.dart';
 import 'add_money_methods_screen.dart';
 import 'notifications_screen.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? entityId;
@@ -25,260 +28,216 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   late final String _entityId;
-
-  bool _loading = true;
-  String? _error;
-  LedgerResponse? _ledger;
   CreditOffer? _credit;
-  double _balance = 0;
+
+  double _toDouble(dynamic val, [double fallback = 0.0]) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val) ?? fallback;
+    return fallback;
+  }
 
   @override
   void initState() {
     super.initState();
     _entityId = widget.entityId ?? AppConfig().entityId;
-    _load();
+    _loadCreditOffer();
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final results = await Future.wait([
-        _api.ledger(_entityId),
-        _api.creditOffer(_entityId),
-      ]);
-      final ledger = results[0] as LedgerResponse;
-      final credit = results[1] as CreditOffer;
-      // Calculate balance: sum of all amounts (positive = inflows, negative = outflows)
-      double bal = 0;
-      for (final e in ledger.entries) {
-        bal += e.amount;
-      }
-      setState(() {
-        _ledger = ledger;
-        _credit = credit;
-        _balance = bal;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
-    }
+  Future<void> _loadCreditOffer() async {
+    _api.creditOffer(_entityId).timeout(const Duration(seconds: 2)).then((credit) {
+      if (mounted) setState(() => _credit = credit);
+    }).catchError((_) {});
+  }
+
+  void _showQuickActionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Quick Actions', style: AppTheme.headingStyle(fontSize: 20)),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.add_circle_outline, color: AppColors.primaryTeal),
+              title: const Text('Add Money / Top Up'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMoneyMethodsScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.send_outlined, color: AppColors.primaryTeal),
+              title: const Text('Send Money Home'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipientsScreen()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.savings_outlined, color: AppColors.primaryTeal),
+              title: const Text('Create New Yard Pot'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const SetGoalIdentityScreen()));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final uid = AuthService.instance.currentUid;
+
     return Scaffold(
       backgroundColor: AppColors.kinMistLight,
       body: BrandedBackground(
-        opacity: 0.08,
+        opacity: 0.02,
         child: SafeArea(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? _buildOfflineMode()
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 12),
-                            _buildHeader(context),
-                            const SizedBox(height: 40),
-                            _buildBalance(context),
-                            if (_balance < 50) _buildLowBalanceAlert(context),
-                            const SizedBox(height: 32),
-                            _buildMainCTA(context),
-                            const SizedBox(height: 32),
-                            _buildCreditCallout(context),
-                            const SizedBox(height: 32),
-                            _buildPotsSection(context),
-                            const SizedBox(height: 32),
-                            _buildRecentTransfersHeader(context),
-                            const SizedBox(height: 16),
-                            ..._buildRecentTransfers(),
-                            const SizedBox(height: 40),
-                            Center(
-                              child: Image.asset(
-                                'assets/images/kin_logo.png',
-                                width: 60,
-                                color: AppColors.kinCoral.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Center(
-                              child: Text(
-                                _credit != null
-                                    ? 'Credit score: ${_credit!.creditScore.toStringAsFixed(0)}/850  •  Limit: \$${_credit!.recommendedLimit.toStringAsFixed(0)}'
-                                    : 'Your support makes home feel closer today.',
-                                style: AppTheme.bodyStyle(
-                                  color: AppColors.kinInk.withValues(alpha: 0.5),
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 100),
-                          ],
-                        ),
-                      ),
+          child: RefreshIndicator(
+            onRefresh: _loadCreditOffer,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  _buildHeader(context, uid),
+                  const SizedBox(height: 36),
+                  _buildBalanceSection(context, uid),
+                  const SizedBox(height: 32),
+                  _buildMainCTA(context),
+                  const SizedBox(height: 32),
+                  _buildCreditCallout(context),
+                  const SizedBox(height: 32),
+                  _buildPotsSection(context, uid),
+                  const SizedBox(height: 32),
+                  _buildRecentTransfersHeader(context),
+                  const SizedBox(height: 16),
+                  _buildRealtimeTransfers(uid),
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Image.asset(
+                      'assets/images/kin_logo.png',
+                      width: 60,
+                      color: AppColors.kinCoral.withValues(alpha: 0.1),
                     ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        mini: true,
-        backgroundColor: Colors.white,
-        child: const Icon(Icons.add, color: AppColors.kinInk),
-      ),
-    );
-  }
-
-  Widget _buildOfflineMode() {
-    // Fallback: show the original static UI when the API is unreachable
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          _buildHeader(context),
-          const SizedBox(height: 40),
-          Text(
-            'Available to send',
-            style: AppTheme.bodyStyle(color: AppColors.kinInk.withValues(alpha: 0.6), fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '£2,450.50',
-            style: AppTheme.headingStyle(fontWeight: FontWeight.bold, color: AppColors.kinInk, fontSize: 36),
-          ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMoneyMethodsScreen())),
-            icon: Icon(Icons.add_circle_outline, color: AppColors.primaryTeal, size: 18),
-            label: Text('Add money', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
-            style: TextButton.styleFrom(
-              backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.05),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 32),
-          _buildMainCTA(context),
-          const SizedBox(height: 32),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.cloud_off, color: Colors.orange, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('API Offline', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('Kin Capital Rails backend unreachable. Showing cached data.',
-                          style: TextStyle(color: Colors.orange.withValues(alpha: 0.8), fontSize: 11)),
-                    ],
                   ),
-                ),
-                IconButton(onPressed: _load, icon: const Icon(Icons.refresh, color: Colors.orange)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          _buildPotsSection(context),
-          const SizedBox(height: 32),
-          _buildRecentTransfersHeader(context),
-          const SizedBox(height: 16),
-          _buildStaticTransferItem(
-            name: 'Waitrose & Partners',
-            time: 'Today, 10:45 AM',
-            amount: '£42.50',
-            status: 'Success',
-          ),
-          const SizedBox(height: 12),
-          _buildStaticTransferItem(
-            name: 'Mom',
-            time: 'Sent 2 days ago',
-            amount: '£45.00',
-            status: 'Success',
-          ),
-          const SizedBox(height: 40),
-          Center(
-            child: Image.asset('assets/images/kin_logo.png', width: 60,
-                color: AppColors.kinCoral.withValues(alpha: 0.3)),
-          ),
-          const SizedBox(height: 100),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            GestureDetector(
-              onTap: () {
-                if (_credit != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => KinCapitalRailsScreen(entityId: _entityId),
-                    ),
-                  );
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.bolt, size: 16, color: Colors.white),
-                    const SizedBox(width: 4),
-                    Text(
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
                       _credit != null
-                          ? '${_credit!.creditScore.toStringAsFixed(0)}/850'
-                          : 'Credit',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ? 'Credit score: ${_credit!.creditScore.toStringAsFixed(0)}/850  •  Limit: \$${_credit!.recommendedLimit.toStringAsFixed(0)}'
+                          : 'Your support makes home feel closer today.',
+                      style: AppTheme.bodyStyle(
+                        color: AppColors.kinInk.withValues(alpha: 0.5),
+                        fontStyle: FontStyle.italic,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 100),
+                ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.notifications_none_outlined, color: AppColors.primary, size: 28),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Image.asset('assets/images/kin_logo.png', width: 140),
-        const SizedBox(height: 12),
-        Text(
-          'Good ${_greeting()}, ${_entityId.split('_').first[0].toUpperCase()}${_entityId.split('_').first.substring(1)}',
-          style: AppTheme.bodyStyle(
-            color: AppColors.kinInk.withValues(alpha: 0.6),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
           ),
         ),
-      ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 85.0),
+        child: FloatingActionButton(
+          onPressed: () => _showQuickActionSheet(context),
+          mini: true,
+          backgroundColor: AppColors.primaryTeal,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  /// 1. Dynamic User Name Header connected to Firestore users/{uid} document
+  Widget _buildHeader(BuildContext context, String uid) {
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: FirestoreService.instance.streamUserProfile(uid),
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? FirestoreService.instance.getCachedUser(uid);
+        final rawName = (profile?['fullName'] as String?)?.isNotEmpty == true
+            ? profile!['fullName'] as String
+            : (AuthService.instance.currentUser?.displayName?.isNotEmpty == true
+                ? AuthService.instance.currentUser!.displayName!
+                : 'Kin User');
+
+        final nameParts = rawName.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+        final firstName = nameParts.isNotEmpty ? nameParts.first : 'User';
+
+        return Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    if (_credit != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => KinCapitalRailsScreen(entityId: _entityId),
+                        ),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.bolt, size: 16, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          _credit != null
+                              ? '${_credit!.creditScore.toStringAsFixed(0)}/850'
+                              : 'Credit',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_outlined, color: AppColors.primary, size: 28),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Image.asset('assets/images/kin_logo.png', width: 140),
+            const SizedBox(height: 12),
+            Text(
+              'Good ${_greeting()}, $firstName',
+              style: AppTheme.bodyStyle(
+                color: AppColors.kinInk.withValues(alpha: 0.6),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -289,32 +248,46 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'evening';
   }
 
-  Widget _buildBalance(BuildContext context) {
-    return Center(
-      child: Column(
-        children: [
-          Text(
-            'Available balance',
-            style: AppTheme.bodyStyle(color: AppColors.kinInk.withValues(alpha: 0.6), fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '\$${_balance.toStringAsFixed(0)}',
-            style: AppTheme.headingStyle(fontWeight: FontWeight.bold, color: AppColors.kinInk, fontSize: 36),
-          ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMoneyMethodsScreen())),
-            icon: Icon(Icons.add_circle_outline, color: AppColors.primaryTeal, size: 18),
-            label: Text('Add money', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
-            style: TextButton.styleFrom(
-              backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.05),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  /// 2. Live Balance connected to Firestore users/{uid} document
+  Widget _buildBalanceSection(BuildContext context, String uid) {
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: FirestoreService.instance.streamUserProfile(uid),
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? FirestoreService.instance.getCachedUser(uid);
+        final balance = _toDouble(profile?['balance']);
+
+        return Column(
+          children: [
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'Available balance',
+                    style: AppTheme.bodyStyle(color: AppColors.kinInk.withValues(alpha: 0.6), fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '£${balance.toStringAsFixed(2)}',
+                    style: AppTheme.headingStyle(fontWeight: FontWeight.bold, color: AppColors.kinInk, fontSize: 36),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddMoneyMethodsScreen())),
+                    icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryTeal, size: 18),
+                    label: const Text('Add money', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+                    style: TextButton.styleFrom(
+                      backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.05),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+            if (balance < 50) _buildLowBalanceAlert(context),
+          ],
+        );
+      },
     );
   }
 
@@ -335,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Balance is low',
+                const Text('Balance is low',
                     style: TextStyle(color: AppColors.kinCoral, fontWeight: FontWeight.bold, fontSize: 14)),
                 Text('Top up now to ensure your scheduled transfers go through.',
                     style: TextStyle(color: AppColors.kinCoral.withValues(alpha: 0.8), fontSize: 11, height: 1.4)),
@@ -415,7 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Agentic Credit Available', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Agentic Credit Available', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 4),
                   Text(
                     '\$${_credit!.recommendedLimit.toStringAsFixed(0)} working capital  •  Score ${_credit!.creditScore.toStringAsFixed(0)}/850',
@@ -431,27 +404,95 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildPotsSection(BuildContext context) {
+  /// 3. Dynamic Yard Pots connected to Firestore users/{uid}/pots subcollection
+  Widget _buildPotsSection(BuildContext context, String uid) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Your Yard Pots', style: AppTheme.headingStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Your Yard Pots', style: AppTheme.headingStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetGoalIdentityScreen())),
+              child: Text('+ Create Pot', style: AppTheme.bodyStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 13)),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 120,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            children: [
-              _buildPotCard(title: 'Family Vacation', amount: '\$450.00', progress: 0.37,
-                  color: AppColors.primaryCoral, icon: Icons.beach_access),
-              const SizedBox(width: 16),
-              _buildPotCard(title: 'School Fees', amount: '\$1,200.00', progress: 0.85,
-                  color: AppColors.primaryTeal, icon: Icons.school),
-              const SizedBox(width: 16),
-              _buildPotCard(title: 'Emergency', amount: '\$800.00', progress: 0.60,
-                  color: Colors.orange, icon: Icons.emergency),
-            ],
-          ),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          stream: FirestoreService.instance.streamUserPots(uid),
+          builder: (context, snapshot) {
+            final pots = snapshot.data ?? [];
+            if (pots.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.primaryTeal.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 24,
+                      backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.1),
+                      child: const Icon(Icons.savings_outlined, color: AppColors.primaryTeal),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('No Yard Pots Yet', style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          const SizedBox(height: 4),
+                          Text('Save towards family goals & emergencies.', style: AppTheme.bodyStyle(color: Colors.grey[600], fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetGoalIdentityScreen())),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryTeal,
+                        foregroundColor: Colors.white,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        elevation: 0,
+                      ),
+                      child: const Text('Create', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return SizedBox(
+              height: 120,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: pots.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 16),
+                itemBuilder: (context, index) {
+                  final pot = pots[index];
+                  final title = pot['title'] ?? 'Yard Pot';
+                  final target = _toDouble(pot['targetAmount'], 500.0);
+                  final saved = _toDouble(pot['savedAmount'], 0.0);
+                  final progress = target > 0 ? (saved / target).clamp(0.0, 1.0) : 0.0;
+
+                  return _buildPotCard(
+                    title: title,
+                    amount: '£${saved.toStringAsFixed(2)} / £${target.toStringAsFixed(0)}',
+                    progress: progress,
+                    color: AppColors.primaryTeal,
+                    icon: Icons.savings_outlined,
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
     );
@@ -465,6 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const YardPotScreen())),
       child: Container(
         width: 200,
+        height: 120,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -480,7 +522,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(child: Text(title, style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis)),
             ]),
             const Spacer(),
-            Text(amount, style: AppTheme.dataStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(amount, style: AppTheme.dataStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
@@ -510,52 +552,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Widget> _buildRecentTransfers() {
-    if (_ledger == null || _ledger!.entries.isEmpty) {
-      return [_buildStaticTransferItem(name: 'No recent activity', time: '', amount: '', status: '')];
-    }
-    final recent = _ledger!.entries.take(5).toList();
-    return recent.map((e) => Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: _buildStaticTransferItem(
-        name: e.counterparty.isNotEmpty ? e.counterparty : _eventTypeLabel(e.eventType),
-        time: _formatTime(e.timestamp),
-        amount: '\$${e.amount.toStringAsFixed(0)}',
-        status: 'Processed',
-      ),
-    )).toList();
+  /// 4. Recent Activity connected to Firestore transactions collection
+  Widget _buildRealtimeTransfers(String uid) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: FirestoreService.instance.streamUserTransactions(uid),
+      builder: (context, snapshot) {
+        final transactions = (snapshot.data?.isNotEmpty == true)
+            ? snapshot.data!
+            : FirestoreService.instance.getCachedTransactions(uid);
+        if (transactions.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+            child: Column(
+              children: [
+                Icon(Icons.history_outlined, size: 36, color: Colors.grey[400]),
+                const SizedBox(height: 8),
+                Text('No Recent Activity', style: AppTheme.bodyStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 4),
+                Text('Top up or send money home to see activity here.', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              ],
+            ),
+          );
+        }
+
+        final recent = transactions.take(5).toList();
+        return Column(
+          children: recent.map((tx) {
+            final title = tx['title'] ?? 'Transaction';
+            final amt = _toDouble(tx['amount']);
+            final type = tx['type'] ?? 'payment';
+            final isNegative = amt < 0;
+            final amtStr = isNegative ? '- £${amt.abs().toStringAsFixed(2)}' : '+ £${amt.toStringAsFixed(2)}';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildTransactionItem(
+                name: title,
+                time: '$type • Processed',
+                amount: amtStr,
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
   }
 
-  String _eventTypeLabel(String type) {
-    const labels = {
-      'remittance': 'Remittance Received',
-      'wallet_transfer': 'Wallet Transfer',
-      'pos_sale': 'POS Sale',
-      'airtime_payment': 'Airtime Payment',
-      'utility_payment': 'Utility Payment',
-    };
-    return labels[type] ?? type;
-  }
-
-  String _formatTime(String ts) {
-    try {
-      final dt = DateTime.parse(ts);
-      return '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return ts;
-    }
-  }
-
-  Widget _buildStaticTransferItem({
-    required String name, required String time, required String amount, required String status,
+  Widget _buildTransactionItem({
+    required String name, required String time, required String amount,
   }) {
-    if (name == 'No recent activity') {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-        child: Center(child: Text('No recent activity', style: TextStyle(color: Colors.grey[400]))),
-      );
-    }
+    final isNegative = amount.contains('-');
     return GestureDetector(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionDetailScreen())),
       child: Container(
@@ -565,8 +613,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: AppColors.primaryTeal.withValues(alpha: 0.1),
-              child: Icon(Icons.swap_horiz, color: AppColors.primaryTeal, size: 20),
+              backgroundColor: isNegative ? AppColors.kinCoral.withValues(alpha: 0.1) : AppColors.primaryTeal.withValues(alpha: 0.1),
+              child: Icon(isNegative ? Icons.send_outlined : Icons.add_circle_outline,
+                  color: isNegative ? AppColors.kinCoral : AppColors.primaryTeal, size: 20),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -581,9 +630,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(amount, style: AppTheme.dataStyle(fontWeight: FontWeight.bold)),
-                if (status.isNotEmpty)
-                  Text(status, style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                Text(amount, style: AppTheme.dataStyle(fontWeight: FontWeight.bold, color: isNegative ? AppColors.kinCoral : AppColors.primaryTeal)),
+                const Text('Success', style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold)),
               ],
             ),
           ],
