@@ -192,7 +192,7 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
           _buildLabel('Identity Document'),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _identityType,
+            initialValue: _identityType,
             items: _identityTypes.map((t) {
               return DropdownMenuItem(value: t.$1, child: Text(t.$2));
             }).toList(),
@@ -286,7 +286,6 @@ class _KycVerificationScreenState extends State<KycVerificationScreen> {
   Widget _buildResult() {
     final r = _result!;
     final passed = r.status == 'PASSED';
-    final pending = r.status == 'PENDING_REVIEW';
 
     return Column(
       children: [

@@ -225,3 +225,5 @@ class KycSubmitResult {
         status: j['status'] as String? ?? 'PASSED',
       );
 }
+
+typedef KycSubmitResponse = KycSubmitResult;
