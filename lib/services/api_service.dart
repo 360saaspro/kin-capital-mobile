@@ -1,7 +1,4 @@
-// Kin Capital Rails API Client
-// Single point of truth for the backend contract. Every call maps 1:1 to
-// an endpoint in the FastAPI backend (app.py).
-// Live API: https://clerk-invest-car-angeles.trycloudflare.com
+// Live API: https://ladle-shamrock-chubby.ngrok-free.dev
 // Base URL overridable via --dart-define=API_BASE_URL
 
 import 'dart:convert';
@@ -16,19 +13,24 @@ class ApiService {
 
   final String baseUrl;
 
-  /// Default to live Cloudflare tunnel, with fallback override support.
+  /// Default to live ngrok public API tunnel, with fallback override support.
   static String _defaultBaseUrl() {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
-    return 'https://clerk-invest-car-angeles.trycloudflare.com';
+    return 'https://ladle-shamrock-chubby.ngrok-free.dev';
   }
 
-  static const _timeout = Duration(seconds: 8);
+  static const _timeout = Duration(seconds: 10);
+
+  Map<String, String> get _headers => {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
+  };
 
   Future<Map<String, dynamic>> _get(String path) async {
     final uri = Uri.parse('$baseUrl$path');
     try {
-      final resp = await http.get(uri).timeout(_timeout);
+      final resp = await http.get(uri, headers: _headers).timeout(_timeout);
       return _decode(resp, uri);
     } catch (_) {
       return _fallbackGet(path);
@@ -39,7 +41,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl$path');
     try {
       final resp = await http
-          .post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
+          .post(uri, headers: _headers, body: jsonEncode(body))
           .timeout(_timeout);
       return _decode(resp, uri);
     } catch (_) {
@@ -164,6 +166,37 @@ class ApiService {
       };
     }
 
+    if (path == '/risk-score') {
+      return {
+        'entity_id': body['entity_id'] ?? 'user_001',
+        'risk_score': 0.12,
+        'features': {
+          'income_stability': 0.85,
+          'default_probability': 0.02,
+          'ledger_health': 0.90,
+        },
+        'model_version': 'v1.0.4-mock'
+      };
+    }
+
+    if (path == '/route-transfer') {
+      return {
+        'id': 'route_mock_001',
+        'from_entity': body['from_entity'] ?? 'user_001',
+        'to_entity': body['to_entity'] ?? 'recipient_001',
+        'amount': body['amount'] ?? 500.0,
+        'currency': body['currency'] ?? 'USD',
+        'selected_route': 'Kin -> USDC -> Local Fiat',
+        'fee': 1.50,
+        'fee_pct': 0.3,
+        'eta': '2 minutes',
+        'alternatives': [
+          {'route': 'SWIFT', 'fee': 15.0, 'fee_pct': 3.0, 'eta': '2-3 days'},
+          {'route': 'Western Union', 'fee': 25.0, 'fee_pct': 5.0, 'eta': '1 hour'},
+        ]
+      };
+    }
+
     return {'status': 'ok'};
   }
 
@@ -270,11 +303,33 @@ class ApiService {
 
   /// POST /orchestrate — full agentic loop (perceive → reason → plan → act → reflect)
   Future<OrchestrationResult> orchestrate(String entityId, {String intent = 'assess credit worthiness'}) async {
-    final d = await _post('/orchestrate', {
+    final path = '/orchestrate?entity_id=${Uri.encodeComponent(entityId)}';
+    final d = await _post(path, {
       'entity_id': entityId,
       'intent': intent,
     });
     return OrchestrationResult.fromJson(d);
+  }
+
+  /// GET /analytics/kyc — pass/flag/reject rates + recent submissions
+  Future<Map<String, dynamic>> getKycAnalytics({int recent = 20}) async {
+    return _get('/analytics/kyc?recent=$recent');
+  }
+
+  /// GET /request-log — filterable log of API requests
+  Future<Map<String, dynamic>> getRequestLogs({
+    int limit = 20,
+    String? entityId,
+    String? endpoint,
+    int? statusCode,
+  }) async {
+    final queryParams = <String, String>{'limit': limit.toString()};
+    if (entityId != null) queryParams['entity_id'] = entityId;
+    if (endpoint != null) queryParams['endpoint'] = endpoint;
+    if (statusCode != null) queryParams['status_code'] = statusCode.toString();
+
+    final queryString = queryParams.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    return _get('/request-log?$queryString');
   }
 }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'split_request_sent_screen.dart';
@@ -94,7 +94,7 @@ class _SplitBillSelectionScreenState extends State<SplitBillSelectionScreen> {
             ),
           ),
           Text(
-            '£${totalAmount.toStringAsFixed(2)}',
+            'J\$${totalAmount.toStringAsFixed(2)}',
             style: AppTheme.dataStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ],
@@ -195,7 +195,7 @@ class _SplitBillSelectionScreenState extends State<SplitBillSelectionScreen> {
             ),
           ),
           Text(
-            '£${amount.toStringAsFixed(2)}',
+            'J\$${amount.toStringAsFixed(2)}',
             style: AppTheme.dataStyle(fontSize: 15, fontWeight: FontWeight.bold),
           ),
         ],
@@ -217,7 +217,7 @@ class _SplitBillSelectionScreenState extends State<SplitBillSelectionScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Total split with $count people', style: TextStyle(color: Colors.grey[600])),
-              Text('£${totalAmount.toStringAsFixed(2)}', style: AppTheme.headingStyle(fontSize: 16)),
+              Text('J\$${totalAmount.toStringAsFixed(2)}', style: AppTheme.headingStyle(fontSize: 16)),
             ],
           ),
           const SizedBox(height: 20),

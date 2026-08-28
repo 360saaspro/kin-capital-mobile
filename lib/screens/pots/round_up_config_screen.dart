@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -172,7 +172,7 @@ class _RoundUpConfigScreenState extends State<RoundUpConfigScreen> {
           Row(
             children: [
               Text(
-                '£45.20',
+                'J\$45.20',
                 style: AppTheme.dataStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 8),

@@ -49,10 +49,11 @@ const List<String> kIndustryOptions = [
 ];
 
 const List<String> kIncomeRangeOptions = [
-  'Under \$1,000 / month',
-  '\$1,000 - \$3,000 / month',
-  '\$3,000 - \$7,500 / month',
-  '\$7,500+ / month',
+  'Under JMD \$150,000 / month',
+  'JMD \$150,000 - \$350,000 / month',
+  'JMD \$350,000 - \$750,000 / month',
+  'JMD \$750,000 - \$1,500,000 / month',
+  'JMD \$1,500,000+ / month',
 ];
 
 /// Step 3: Employment & Income Profile
@@ -72,7 +73,7 @@ class EmploymentStatusScreen extends StatefulWidget {
 class _EmploymentStatusScreenState extends State<EmploymentStatusScreen> {
   String _selectedStatus = 'self_employed';
   String _selectedIndustry = kIndustryOptions[0];
-  String _selectedIncome = kIncomeRangeOptions[1]; // '$1,000 - $3,000' default
+  String _selectedIncome = kIncomeRangeOptions[1]; // JMD $150,000 - $350,000 default
 
   void _handleNext() {
     KinHaptics.lightTap();
@@ -246,7 +247,7 @@ class _EmploymentStatusScreenState extends State<EmploymentStatusScreen> {
                     const SizedBox(height: 20),
 
                     // 3. Monthly Income / Cash Flow Bracket Dropdown
-                    Text('ESTIMATED MONTHLY CASH FLOW', style: AppTheme.labelStyle(fontSize: 11, color: Colors.grey[700])),
+                    Text('ESTIMATED MONTHLY CASH FLOW (JMD \$)', style: AppTheme.labelStyle(fontSize: 11, color: Colors.grey[700])),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

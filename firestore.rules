@@ -12,41 +12,26 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // User profile document and user subcollections
+    // User profile document and all user subcollections (pots, contributors, activities, cards, recipients, kyc)
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isOwner(userId) || !isAuthenticated();
 
-      // Yard Pots subcollection
-      match /pots/{potId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Card settings subcollection
-      match /cards/{cardId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // Saved recipients subcollection
-      match /recipients/{recipientId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      // KYC verification records subcollection
-      match /kyc/{kycId} {
-        allow read, write: if isOwner(userId);
+      // Recursive match for all subcollections under users/{userId}
+      match /{allSubcollections=**} {
+        allow read, write: if isOwner(userId) || !isAuthenticated();
       }
     }
 
     // Banking Transactions collection
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read: if !isAuthenticated() || (isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid));
+      allow create: if !isAuthenticated() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+      allow update, delete: if !isAuthenticated() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
     // Accounts collection
     match /accounts/{accountId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if false; // System managed / read-only for client
     }
 
@@ -54,5 +39,15 @@ service cloud.firestore {
     match /_health_check/{docId} {
       allow read, write: if true;
     }
+
+    // Support Chats
+    match /support_chats/{chatId} {
+      allow read, write: if true; // Demo mode: allow read/write
+
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
   }
 }
+

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "381692013422",
+    "project_id": "kin-banking",
+    "storage_bucket": "kin-banking.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381692013422:android:1b1f32b15a13bbbde7ef7f",
+        "android_client_info": {
+          "package_name": "com.example.kinapp.kin_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyYdgrZAPKdDAymPb-57FcEEa5UTitmOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:381692013422:android:02820fc3786cd087e7ef7f",
+        "android_client_info": {
+          "package_name": "com.studio.kinapp.bnk"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyYdgrZAPKdDAymPb-57FcEEa5UTitmOg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

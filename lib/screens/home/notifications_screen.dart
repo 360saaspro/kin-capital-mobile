@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -32,7 +32,7 @@ class NotificationsScreen extends StatelessWidget {
               icon: Icons.call_received,
               iconColor: Colors.teal,
               title: 'Money received',
-              subtitle: 'Mom sent you £50.00 • 2h ago',
+              subtitle: 'Mom sent you J\$50.00 • 2h ago',
             ),
             _buildNotificationItem(
               icon: Icons.security,
@@ -47,7 +47,7 @@ class NotificationsScreen extends StatelessWidget {
               icon: Icons.error_outline,
               iconColor: Colors.red,
               title: 'Payment failed',
-              subtitle: 'Starlink Subscription • £89.00 • Yesterday',
+              subtitle: 'Starlink Subscription • J\$89.00 • Yesterday',
             ),
             _buildNotificationItem(
               icon: Icons.fingerprint,
@@ -59,7 +59,7 @@ class NotificationsScreen extends StatelessWidget {
               icon: Icons.trending_up,
               iconColor: Colors.purple,
               title: 'Interest paid',
-              subtitle: 'Your Kin Vault earned £12.45 • Yesterday',
+              subtitle: 'Your Kin Vault earned J\$12.45 • Yesterday',
             ),
             const SizedBox(height: 40),
             Center(

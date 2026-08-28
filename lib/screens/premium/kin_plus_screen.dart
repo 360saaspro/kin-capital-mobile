@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -58,7 +58,7 @@ class KinPlusScreen extends StatelessWidget {
                 
                 _buildFeature(
                   Icons.send_outlined,
-                  'Free transfers up to £1,000/mo',
+                  'Free transfers up to J\$1,000/mo',
                   'Move money globally without the extra cost.',
                 ),
                 _buildFeature(
@@ -95,7 +95,7 @@ class KinPlusScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '£4.99/month',
+                              'J\$4.99/month',
                               style: AppTheme.dataStyle(fontSize: 24, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),

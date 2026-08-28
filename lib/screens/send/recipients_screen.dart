@@ -4,6 +4,9 @@ import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
 import 'send_amount_screen.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../home/notifications_screen.dart';
 
 class RecipientsScreen extends StatefulWidget {
   const RecipientsScreen({super.key});
@@ -15,6 +18,43 @@ class RecipientsScreen extends StatefulWidget {
 class _RecipientsScreenState extends State<RecipientsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  List<Contact> _deviceContacts = [];
+  bool _hasPermission = false;
+  bool _isLoadingContacts = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContacts();
+  }
+
+  Future<void> _loadContacts() async {
+    final status = await Permission.contacts.request();
+    if (status.isGranted) {
+      final contacts = await FlutterContacts.getContacts(withProperties: true);
+      if (mounted) {
+        setState(() {
+          _deviceContacts = contacts;
+          _hasPermission = true;
+          _isLoadingContacts = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _hasPermission = false;
+          _isLoadingContacts = false;
+        });
+      }
+    }
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  }
 
   @override
   void dispose() {
@@ -135,7 +175,7 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Good morning',
+                            'Good ${_greeting()}',
                             style: AppTheme.headingStyle(
                               fontSize: 18,
                               color: AppColors.primaryTeal,
@@ -143,7 +183,26 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
                           ),
                         ],
                       ),
-                      const Icon(Icons.notifications_outlined, color: AppColors.primaryTeal),
+                      StreamBuilder<List<Map<String, dynamic>>>(
+                        stream: FirestoreService.instance.streamUserNotifications(AuthService.instance.currentUid),
+                        builder: (context, snapshot) {
+                          final notifications = snapshot.data ?? FirestoreService.instance.getCachedNotifications(AuthService.instance.currentUid);
+                          final activeNotifications = notifications.where((n) {
+                            final type = n['type']?.toString().toLowerCase();
+                            final isRead = n['isRead'] == true;
+                            return !isRead && (type == 'notification' || type == 'offer');
+                          }).toList();
+
+                          if (activeNotifications.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          return IconButton(
+                            icon: const Icon(Icons.notifications_active, color: AppColors.primaryTeal, size: 28),
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+                          );
+                        }
+                      ),
                     ],
                   ),
                   const SizedBox(height: 32),
@@ -225,16 +284,53 @@ class _RecipientsScreenState extends State<RecipientsScreen> {
                       stream: FirestoreService.instance.streamUserRecipients(AuthService.instance.currentUid),
                       builder: (context, snapshot) {
                         final firestoreRecipients = snapshot.data ?? [];
+                        
+                        final deviceContactsMapped = _deviceContacts.map((c) {
+                          return {
+                            'name': c.displayName,
+                            'detail': c.phones.isNotEmpty ? c.phones.first.number : 'No phone number',
+                          };
+                        });
+
                         final all = [
-                          {'name': 'Andre Anderson', 'detail': '@dre_anderson'},
-                          {'name': 'Brianna Brown', 'detail': '+1 (876) 555-0123'},
-                          {'name': 'Chris Campbell', 'detail': '+1 (876) 444-9876'},
                           ...firestoreRecipients.map((r) => {'name': r['name'] ?? '', 'detail': r['phone'] ?? ''}),
+                          ...deviceContactsMapped,
                         ].where((c) {
                           if (_searchQuery.isEmpty) return true;
                           final n = (c['name'] ?? '').toLowerCase();
                           return n.contains(_searchQuery);
                         }).toList();
+
+                        if (_isLoadingContacts && all.isEmpty) {
+                          return const Center(child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: CircularProgressIndicator(color: AppColors.primaryTeal),
+                          ));
+                        }
+
+                        if (!_hasPermission && firestoreRecipients.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Column(
+                                children: [
+                                  Text('Contacts permission denied', style: AppTheme.headingStyle(fontSize: 16)),
+                                  const SizedBox(height: 8),
+                                  Text('Enable contacts permission in settings or add recipients manually.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600])),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        if (all.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32.0),
+                              child: Text('No contacts found.', style: TextStyle(color: Colors.grey[600])),
+                            ),
+                          );
+                        }
 
                         return Column(
                           children: all.map((c) {

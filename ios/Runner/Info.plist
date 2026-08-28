@@ -4,6 +4,12 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Kin requires camera access to scan identity documents and verify biometric liveness.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Kin requires microphone access for video verification.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Kin requires access to your contacts to let you send money easily to friends and family.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

@@ -76,7 +76,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = AuthService.parseAuthError(e);
           _isLoading = false;
         });
       }

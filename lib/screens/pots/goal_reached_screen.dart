@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -43,7 +43,7 @@ class GoalReachedScreen extends StatelessWidget {
                   style: AppTheme.bodyStyle(color: Colors.grey[600], fontSize: 14),
                   children: [
                     const TextSpan(text: "You've saved "),
-                    TextSpan(text: '£500', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.kinInk)),
+                    TextSpan(text: 'J\$500', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.kinInk)),
                     const TextSpan(text: " for your "),
                     TextSpan(text: 'Vacation Fund', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryTeal)),
                     const TextSpan(text: " purely through round-ups."),
@@ -128,7 +128,7 @@ class GoalReachedScreen extends StatelessWidget {
             child: const Text('Final Balance', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 16),
-          Text('£500.00', style: AppTheme.headingStyle(fontSize: 40, color: AppColors.primaryTeal)),
+          Text('J\$500.00', style: AppTheme.headingStyle(fontSize: 40, color: AppColors.primaryTeal)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

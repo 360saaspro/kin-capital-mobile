@@ -14,26 +14,12 @@ class AddMoneyMethodsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            radius: 20,
-            backgroundImage: const NetworkImage('https://i.pravatar.cc/150?u=camille'),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.kinInk),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Good morning', style: AppTheme.bodyStyle(color: Colors.grey[600], fontSize: 14)),
-            Text('Camille', style: AppTheme.headingStyle(fontSize: 18)),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.kinInk),
-            onPressed: () {},
-          ),
-        ],
+        title: Text('Add Money', style: AppTheme.headingStyle(fontSize: 18)),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),

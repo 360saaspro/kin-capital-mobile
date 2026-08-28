@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -30,14 +30,14 @@ class RoundUpHistoryScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _buildHistoryItem(
               merchant: 'Island Groceries',
-              total: '£42.50',
-              roundUp: '£0.50',
+              total: 'J\$42.50',
+              roundUp: 'J\$0.50',
               icon: Icons.shopping_cart_outlined,
             ),
             _buildHistoryItem(
               merchant: 'Blue Mountain Brew',
-              total: '£3.20',
-              roundUp: '£0.80',
+              total: 'J\$3.20',
+              roundUp: 'J\$0.80',
               icon: Icons.coffee_outlined,
             ),
             const SizedBox(height: 32),
@@ -45,20 +45,20 @@ class RoundUpHistoryScreen extends StatelessWidget {
             const SizedBox(height: 16),
             _buildHistoryItem(
               merchant: 'Kingston Taxi Service',
-              total: '£18.05',
-              roundUp: '£0.95',
+              total: 'J\$18.05',
+              roundUp: 'J\$0.95',
               icon: Icons.local_taxi_outlined,
             ),
             _buildHistoryItem(
               merchant: 'Jerky\'s Grill',
-              total: '£27.40',
-              roundUp: '£0.60',
+              total: 'J\$27.40',
+              roundUp: 'J\$0.60',
               icon: Icons.restaurant_outlined,
             ),
             _buildHistoryItem(
               merchant: 'Utility Bill Pay',
-              total: '£105.15',
-              roundUp: '£0.85',
+              total: 'J\$105.15',
+              roundUp: 'J\$0.85',
               icon: Icons.receipt_long_outlined,
             ),
             const SizedBox(height: 40),
@@ -95,7 +95,7 @@ class RoundUpHistoryScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '£12.40',
+            'J\$12.40',
             style: AppTheme.headingStyle(color: Colors.white, fontSize: 36),
           ),
           const SizedBox(height: 8),

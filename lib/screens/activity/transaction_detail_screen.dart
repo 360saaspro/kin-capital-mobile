@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -96,7 +96,7 @@ class TransactionDetailScreen extends StatelessWidget {
         children: [
           Text('AMOUNT SENT', style: TextStyle(fontSize: 10, color: Colors.grey[500], fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           const SizedBox(height: 12),
-          Text('£150.00', style: AppTheme.headingStyle(fontSize: 40, color: AppColors.primaryTeal)),
+          Text('J\$150.00', style: AppTheme.headingStyle(fontSize: 40, color: AppColors.primaryTeal)),
           const SizedBox(height: 24),
           const Divider(height: 1, color: AppColors.kinMist),
           const SizedBox(height: 24),
@@ -118,7 +118,7 @@ class TransactionDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              Text('£0.00', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text('J\$0.00', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold, fontSize: 13)),
             ],
           ),
         ],

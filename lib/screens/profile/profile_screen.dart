@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
@@ -8,9 +12,22 @@ import 'security_center_screen.dart';
 import 'personal_details_screen.dart';
 import 'bank_accounts_screen.dart';
 import '../home/receiver_home_screen.dart';
+import '../../core/services/currency_service.dart';
+import '../admin/admin_panel_screen.dart';
+import '../home/notifications_screen.dart';
+import '../cards/cards_screen.dart';
+import '../auth/forgot_password_screen.dart';
+import 'support_chat_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _isUploadingImage = false;
 
   Future<void> _handleLogout(BuildContext context) async {
     await AuthService.instance.signOut();
@@ -20,6 +37,36 @@ class ProfileScreen extends StatelessWidget {
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800);
+      
+      if (image == null) return;
+      
+      setState(() => _isUploadingImage = true);
+
+      final uid = AuthService.instance.currentUid;
+      final ext = image.name.split('.').last;
+      final ref = FirebaseStorage.instance.ref().child('profile_pictures/$uid.$ext');
+      
+      await ref.putFile(File(image.path));
+      final downloadUrl = await ref.getDownloadURL();
+      
+      await AuthService.instance.currentUser?.updatePhotoURL(downloadUrl);
+      await FirestoreService.instance.updateUserProfile(uid, {'photoURL': downloadUrl});
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingImage = false);
+      }
     }
   }
 
@@ -35,9 +82,25 @@ class ProfileScreen extends StatelessWidget {
           style: AppTheme.headingStyle(fontSize: 20),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.kinInk),
-            onPressed: () {},
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: FirestoreService.instance.streamUserNotifications(AuthService.instance.currentUid),
+            builder: (context, snapshot) {
+              final notifications = snapshot.data ?? FirestoreService.instance.getCachedNotifications(AuthService.instance.currentUid);
+              final activeNotifications = notifications.where((n) {
+                final type = n['type']?.toString().toLowerCase();
+                final isRead = n['isRead'] == true;
+                return !isRead && (type == 'notification' || type == 'offer');
+              }).toList();
+
+              if (activeNotifications.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              return IconButton(
+                icon: const Icon(Icons.notifications_active, color: AppColors.primaryTeal, size: 28),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+              );
+            }
           ),
         ],
       ),
@@ -49,6 +112,19 @@ class ProfileScreen extends StatelessWidget {
             _buildProfileHeader(),
             const SizedBox(height: 40),
             
+            _buildSectionHeader('PREFERENCES'),
+            ValueListenableBuilder<AppCurrency>(
+              valueListenable: CurrencyService.instance.currency,
+              builder: (context, currency, _) {
+                return _buildSettingsItem(
+                  Icons.currency_exchange,
+                  'Display currency',
+                  trailingText: currency.code,
+                  onTap: () => _showCurrencyPicker(context),
+                );
+              },
+            ),
+
             _buildSectionHeader('ACCOUNT'),
             _buildSettingsItem(
               Icons.person_outline,
@@ -60,33 +136,23 @@ class ProfileScreen extends StatelessWidget {
                 );
               },
             ),
-            _buildSettingsItem(
-              Icons.account_balance_outlined,
-              'Bank accounts',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BankAccountsScreen()),
-                );
-              },
-            ),
-            _buildSettingsItem(
-              Icons.swap_horiz,
-              'Switch to Receiver Mode (Demo)',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ReceiverHomeScreen()),
-                );
-              },
-            ),
+
             
             _buildSectionHeader('IDENTITY & LIMITS'),
             _buildSettingsItem(Icons.verified_user_outlined, 'KYC status', trailingText: 'Verified'),
-            _buildSettingsItem(Icons.trending_up, 'Transfer limits'),
+
             
             _buildSectionHeader('CARDS'),
-            _buildSettingsItem(Icons.credit_card, 'Manage physical and virtual cards'),
+            _buildSettingsItem(
+              Icons.credit_card, 
+              'Manage physical and virtual cards',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CardsScreen()),
+                );
+              },
+            ),
             
             _buildSectionHeader('SECURITY'),
             _buildSettingsItem(Icons.security, 'Security center', onTap: () {
@@ -95,15 +161,46 @@ class ProfileScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (context) => const SecurityCenterScreen()),
               );
             }),
-            _buildSettingsToggleItem(Icons.face_unlock_outlined, 'Face ID', true),
-            _buildSettingsItem(Icons.lock_outline, 'Change PIN'),
+            _buildSettingsItem(
+              Icons.lock_outline, 
+              'Change Password',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                );
+              },
+            ),
             
             _buildSectionHeader('NOTIFICATIONS'),
             _buildSettingsItem(Icons.notifications_none, 'Push and email preferences'),
             
             _buildSectionHeader('HELP & SUPPORT'),
-            _buildSettingsItem(Icons.help_outline, 'Help center'),
-            _buildSettingsItem(Icons.chat_bubble_outline, 'Chat with us'),
+            _buildSettingsItem(
+              Icons.help_outline, 
+              'Help center',
+              onTap: () async {
+                final Uri emailLaunchUri = Uri(
+                  scheme: 'mailto',
+                  path: 'support@kin-banking.com',
+                );
+                try {
+                  await launchUrl(emailLaunchUri);
+                } catch (e) {
+                  // Ignore if can't launch
+                }
+              },
+            ),
+            _buildSettingsItem(
+              Icons.chat_bubble_outline, 
+              'Chat with us',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SupportChatScreen()),
+                );
+              },
+            ),
             
             _buildSectionHeader('LEGAL'),
             _buildSettingsItem(Icons.description_outlined, 'Terms of service'),
@@ -120,6 +217,43 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _showCurrencyPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Display Currency', style: AppTheme.headingStyle(fontSize: 20)),
+              const SizedBox(height: 8),
+              Text('Choose how your balances are displayed', style: AppTheme.bodyStyle(color: Colors.grey)),
+              const SizedBox(height: 20),
+              ...AppCurrency.values.map((currency) {
+                return ListTile(
+                  title: Text(currency.label),
+                  trailing: CurrencyService.instance.currency.value == currency
+                      ? const Icon(Icons.check, color: AppColors.primaryTeal)
+                      : null,
+                  onTap: () {
+                    CurrencyService.instance.setCurrency(currency);
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildProfileHeader() {
     return StreamBuilder<Map<String, dynamic>?>(
       stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
@@ -133,24 +267,41 @@ class ProfileScreen extends StatelessWidget {
             Stack(
               alignment: Alignment.bottomRight,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.orange, Colors.red],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      'kin',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.kinInk,
+                GestureDetector(
+                  onTap: _pickAndUploadImage,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.orange, Colors.red],
                       ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          backgroundImage: profile?['photoURL'] != null 
+                              ? NetworkImage(profile!['photoURL']) 
+                              : (AuthService.instance.currentUser?.photoURL != null 
+                                  ? NetworkImage(AuthService.instance.currentUser!.photoURL!) 
+                                  : null),
+                          child: (profile?['photoURL'] == null && AuthService.instance.currentUser?.photoURL == null) 
+                            ? const Text(
+                                'kin',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.kinInk,
+                                ),
+                              ) 
+                            : null,
+                        ),
+                        if (_isUploadingImage)
+                          const CircularProgressIndicator(color: Colors.white),
+                      ],
                     ),
                   ),
                 ),

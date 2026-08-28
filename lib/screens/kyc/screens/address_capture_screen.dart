@@ -66,14 +66,14 @@ class AddressCaptureScreen extends StatefulWidget {
 
 class _AddressCaptureScreenState extends State<AddressCaptureScreen> {
   final _searchController = TextEditingController();
-  final _streetController = TextEditingController(text: '14 Hope Road');
-  final _cityController = TextEditingController(text: 'Kingston');
-  final _countryController = TextEditingController(text: 'Jamaica');
+  final _streetController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _countryController = TextEditingController();
 
   String _selectedDuration = kResidenceDurationOptions[2]; // '1 - 3 years' default
   List<Map<String, String>> _filteredSuggestions = [];
   bool _showSuggestions = false;
-  bool _isButtonActive = true;
+  bool _isButtonActive = false;
 
   @override
   void initState() {
@@ -81,6 +81,7 @@ class _AddressCaptureScreenState extends State<AddressCaptureScreen> {
     _searchController.addListener(_onSearchChanged);
     _streetController.addListener(_validateInputs);
     _cityController.addListener(_validateInputs);
+    _countryController.addListener(_validateInputs);
   }
 
   void _onSearchChanged() {
@@ -233,10 +234,13 @@ class _AddressCaptureScreenState extends State<AddressCaptureScreen> {
                           separatorBuilder: (context, index) => const Divider(height: 1),
                           itemBuilder: (context, index) {
                             final item = _filteredSuggestions[index];
-                            return ListTile(
-                              leading: const Icon(Icons.location_on_outlined, color: AppColors.primaryTeal, size: 20),
-                              title: Text(item['display']!, style: AppTheme.bodyStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                              onTap: () => _selectSuggestion(item),
+                            return Material(
+                              color: Colors.transparent,
+                              child: ListTile(
+                                leading: const Icon(Icons.location_on_outlined, color: AppColors.primaryTeal, size: 20),
+                                title: Text(item['display']!, style: AppTheme.bodyStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                                onTap: () => _selectSuggestion(item),
+                              ),
                             );
                           },
                         ),

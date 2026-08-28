@@ -3,6 +3,7 @@ import '../../../core/services/haptic_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/kin_bounceable.dart';
+import '../../../core/services/auth_service.dart';
 
 class CaribbeanCountry {
   final String name;
@@ -49,11 +50,15 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _dobController = TextEditingController(text: '1995-06-15');
 
   final FocusNode _fullNameFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
   final FocusNode _phoneFocus = FocusNode();
+  final FocusNode _passwordFocus = FocusNode();
+  
+  bool _obscurePassword = true;
 
   CaribbeanCountry _selectedCountry = kCaribbeanCountries.first; // Jamaica default
   DateTime? _selectedDate = DateTime(1995, 6, 15);
@@ -61,9 +66,11 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
   String? _nameError;
   String? _emailError;
   String? _phoneError;
+  String? _passwordError;
   String? _dobError;
 
   bool _isButtonActive = false;
+  bool _isLoading = false;
   bool _hasTriggeredHaptic = false;
 
   @override
@@ -77,6 +84,7 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
     _fullNameController.addListener(_validateInputs);
     _emailController.addListener(_validateInputs);
     _phoneController.addListener(_validateInputs);
+    _passwordController.addListener(_validateInputs);
     _dobController.addListener(_validateInputs);
   }
 
@@ -84,20 +92,23 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
     final name = _fullNameController.text.trim();
     final email = _emailController.text.trim();
     final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    final password = _passwordController.text;
 
     final isNameValid = name.contains(' ') && name.length >= 3;
     final isEmailValid = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
     final isPhoneValid = phoneDigits.length >= 7;
+    final isPasswordValid = password.length >= 6;
     final isAgeValid = _selectedDate != null && _calculateAge(_selectedDate!) >= 18;
 
     setState(() {
       _nameError = name.isNotEmpty && !isNameValid ? 'Enter full first and last name' : null;
       _emailError = email.isNotEmpty && !isEmailValid ? 'Enter a valid email address' : null;
       _phoneError = phoneDigits.isNotEmpty && !isPhoneValid ? 'Enter valid phone number' : null;
+      _passwordError = password.isNotEmpty && !isPasswordValid ? 'Minimum 6 characters' : null;
       _dobError = _selectedDate != null && !isAgeValid ? 'Must be at least 18 years old' : null;
     });
 
-    final isValid = isNameValid && isEmailValid && isPhoneValid && isAgeValid;
+    final isValid = isNameValid && isEmailValid && isPhoneValid && isPasswordValid && isAgeValid;
 
     if (isValid != _isButtonActive) {
       setState(() {
@@ -210,18 +221,39 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
     );
   }
 
-  void _handleNext() {
-    if (!_isButtonActive) return;
+  Future<void> _handleNext() async {
+    if (!_isButtonActive || _isLoading) return;
     KinHaptics.lightTap();
 
-    widget.onNext({
-      'full_name': _fullNameController.text.trim(),
-      'email': _emailController.text.trim(),
-      'phone': '${_selectedCountry.dialCode} ${_phoneController.text.trim()}',
-      'country_of_residence': _selectedCountry.name,
-      'nationality': _selectedCountry.name,
-      'date_of_birth': _dobController.text.trim(),
-    });
+    setState(() => _isLoading = true);
+
+    try {
+      await AuthService.instance.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        phone: '${_selectedCountry.dialCode} ${_phoneController.text.trim()}',
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        widget.onNext({
+          'full_name': _fullNameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': '${_selectedCountry.dialCode} ${_phoneController.text.trim()}',
+          'country_of_residence': _selectedCountry.name,
+          'nationality': _selectedCountry.name,
+          'date_of_birth': _dobController.text.trim(),
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AuthService.parseAuthError(e))),
+        );
+      }
+    }
   }
 
   @override
@@ -229,10 +261,12 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
     _dobController.dispose();
     _fullNameFocus.dispose();
     _emailFocus.dispose();
     _phoneFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -366,7 +400,37 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 4. Date of Birth with Native Calendar Picker
+                    // 4. Password Input
+                    Text('PASSWORD', style: AppTheme.labelStyle(fontSize: 11, color: Colors.grey[700])),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _passwordController,
+                      focusNode: _passwordFocus,
+                      obscureText: _obscurePassword,
+                      style: AppTheme.bodyStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        hintText: 'Minimum 6 characters',
+                        errorText: _passwordError,
+                        prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryTeal),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey[200]!)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.grey[200]!)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primaryTeal, width: 2)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 5. Date of Birth with Native Calendar Picker
                     Text('DATE OF BIRTH', style: AppTheme.labelStyle(fontSize: 11, color: Colors.grey[700])),
                     const SizedBox(height: 6),
                     InkWell(
@@ -418,14 +482,16 @@ class _FriendlyDataCaptureScreenState extends State<FriendlyDataCaptureScreen> {
                         : null,
                   ),
                   child: Center(
-                    child: Text(
-                      'Next',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _isButtonActive ? Colors.white : Colors.grey[600],
-                      ),
-                    ),
+                    child: _isLoading 
+                        ? const CircularProgressIndicator(color: Colors.white) 
+                        : Text(
+                            'Next',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _isButtonActive ? Colors.white : Colors.grey[600],
+                            ),
+                          ),
                   ),
                 ),
               ),

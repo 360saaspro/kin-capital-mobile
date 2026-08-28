@@ -9,6 +9,9 @@ import '../../core/theme/app_theme.dart';
 import '../../models/api_models.dart';
 import '../../services/api_service.dart';
 
+import '../../core/services/auth_service.dart';
+import '../../core/services/firestore_service.dart';
+
 class KinCapitalRailsScreen extends StatefulWidget {
   final String entityId;
   const KinCapitalRailsScreen({super.key, required this.entityId});
@@ -21,10 +24,13 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
   final _api = ApiService();
 
   bool _loading = true;
+  bool _applying = false;
   String? _error;
   CreditOffer? _credit;
   RiskScore? _risk;
   RouteResult? _route;
+  
+  bool _hasApplied = false;
 
   @override
   void initState() {
@@ -38,25 +44,94 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _api.creditOffer(widget.entityId, requestedAmount: 50000),
-        _api.riskScore(widget.entityId),
-        _api.routeTransfer(
-          fromEntity: widget.entityId,
-          toEntity: 'recipient_001',
-          amount: 500,
-        ),
-      ]);
+      final uid = AuthService.instance.currentUid;
+      final profile = await FirestoreService.instance.getUserProfile(uid);
+      final creditProfile = profile?['creditProfile'] as Map<String, dynamic>?;
+      
+      final savedModel = creditProfile?['modelVersion'] as String?;
+      final hasValidModel = savedModel != null && savedModel.isNotEmpty;
+
+      _hasApplied = creditProfile != null && 
+                    creditProfile['status'] == 'approved' &&
+                    hasValidModel;
+
+      if (_hasApplied) {
+        // Load from Firestore data instead of API
+        _credit = CreditOffer(
+          entityId: widget.entityId,
+          creditScore: (creditProfile!['creditScore'] as num).toDouble(),
+          riskScore: (creditProfile['riskScore'] as num).toDouble(),
+          recommendedLimit: (creditProfile['creditLimit'] as num).toDouble(),
+          explanation: creditProfile['explanation'] ?? '',
+          escalated: creditProfile['escalated'] ?? false,
+          escalationReason: creditProfile['escalationReason'] ?? '',
+        );
+        _risk = RiskScore(
+          entityId: widget.entityId,
+          riskScore: (creditProfile['riskScore'] as num).toDouble(),
+          features: creditProfile['features'] as Map<String, dynamic>? ?? {},
+          modelVersion: creditProfile['modelVersion'] ?? 'unknown',
+        );
+      }
+
+      // Always load live route data as it's transactional
+      _route = await _api.routeTransfer(
+        fromEntity: widget.entityId,
+        toEntity: 'recipient_001',
+        amount: 500,
+      );
+      
       setState(() {
-        _credit = results[0] as CreditOffer;
-        _risk = results[1] as RiskScore;
-        _route = results[2] as RouteResult;
         _loading = false;
       });
     } catch (e) {
       setState(() {
         _error = e.toString();
         _loading = false;
+      });
+    }
+  }
+  
+  Future<void> _applyForCredit() async {
+    setState(() {
+      _applying = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        _api.creditOffer(widget.entityId, requestedAmount: 50000),
+        _api.riskScore(widget.entityId),
+      ]);
+      
+      final c = results[0] as CreditOffer;
+      final r = results[1] as RiskScore;
+      
+      final creditData = {
+        'status': 'approved',
+        'creditScore': c.creditScore,
+        'creditLimit': c.recommendedLimit,
+        'riskScore': r.riskScore,
+        'explanation': c.explanation,
+        'escalated': c.escalated,
+        'escalationReason': c.escalationReason,
+        'modelVersion': r.modelVersion,
+        'features': r.features,
+        'lastAssessmentDate': DateTime.now().toIso8601String(),
+      };
+      
+      final uid = AuthService.instance.currentUid;
+      await FirestoreService.instance.updateCreditProfile(uid, creditData);
+      
+      setState(() {
+        _credit = c;
+        _risk = r;
+        _hasApplied = true;
+        _applying = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to apply: $e';
+        _applying = false;
       });
     }
   }
@@ -78,6 +153,8 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
           ? _buildError()
+          : !_hasApplied
+          ? _buildApplyScreen()
           : RefreshIndicator(
               onRefresh: _load,
               child: SingleChildScrollView(
@@ -91,13 +168,52 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
                     _buildRiskFactorsCard(),
                     const SizedBox(height: 20),
                     _buildRouteCard(),
-                    const SizedBox(height: 20),
-                    _buildOrchestrateButton(),
                     const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildApplyScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.psychology, size: 64, color: AppColors.primaryTeal),
+            const SizedBox(height: 24),
+            Text(
+              'Apply for Capital Rails',
+              style: AppTheme.headingStyle(fontSize: 24),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Our AI agent will review your ledger activity and calculate a working capital limit tailored for you.',
+              style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[700]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 40),
+            _applying
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _applyForCredit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryTeal,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text('Assess My Credit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -507,80 +623,4 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
     );
   }
 
-  Widget _buildOrchestrateButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          try {
-            final result = await _api.orchestrate(widget.entityId);
-            if (!mounted) return;
-            showDialog(
-              context: context,
-              builder: (_) => AlertDialog(
-                title: const Text('Orchestration Result'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (result.llmReasoning != null) ...[
-                        Text(
-                          'Reasoning:',
-                          style: AppTheme.bodyStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          result.llmReasoning!,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      Text(
-                        'Plan:',
-                        style: AppTheme.bodyStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      ...result.plan.map(
-                        (p) =>
-                            Text('• $p', style: const TextStyle(fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-            );
-          } catch (e) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Orchestration failed: $e')));
-          }
-        },
-        icon: const Icon(Icons.psychology, color: AppColors.primaryTeal),
-        label: const Text(
-          'Run Full Orchestration',
-          style: TextStyle(
-            color: AppColors.primaryTeal,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.primaryTeal),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-        ),
-      ),
-    );
-  }
 }

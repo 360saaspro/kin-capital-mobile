@@ -2,9 +2,53 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/firestore_service.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/currency_service.dart';
 
-class SpendingAnalyticsScreen extends StatelessWidget {
+class SpendingAnalyticsScreen extends StatefulWidget {
   const SpendingAnalyticsScreen({super.key});
+
+  @override
+  State<SpendingAnalyticsScreen> createState() => _SpendingAnalyticsScreenState();
+}
+
+class _SpendingAnalyticsScreenState extends State<SpendingAnalyticsScreen> {
+  String _selectedPeriod = 'Month'; // 'Week', 'Month', 'Year'
+
+  List<Map<String, dynamic>> _filterTransactions(List<Map<String, dynamic>> allTx) {
+    final now = DateTime.now();
+    return allTx.where((t) {
+      if (t['type'] != 'withdrawal' && t['type'] != 'payment' && t['type'] != 'expense' && t['type'] != 'transfer') return false;
+      final createdAtStr = t['createdAt'] as String?;
+      if (createdAtStr == null) return false;
+      try {
+        final date = DateTime.parse(createdAtStr);
+        if (_selectedPeriod == 'Week') {
+          return now.difference(date).inDays <= 7;
+        } else if (_selectedPeriod == 'Month') {
+          return date.month == now.month && date.year == now.year;
+        } else if (_selectedPeriod == 'Year') {
+          return date.year == now.year;
+        }
+        return false;
+      } catch (_) {
+        return false;
+      }
+    }).toList();
+  }
+
+  String _getPeriodSubtitle() {
+    final now = DateTime.now();
+    if (_selectedPeriod == 'Week') {
+      return 'Last 7 Days';
+    } else if (_selectedPeriod == 'Month') {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${months[now.month - 1]} 1 - ${months[now.month - 1]} ${DateTime(now.year, now.month + 1, 0).day}, ${now.year}';
+    } else {
+      return 'Jan 1 - Dec 31, ${now.year}';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,23 +64,47 @@ class SpendingAnalyticsScreen extends StatelessWidget {
         title: Text('Spending Insights', style: AppTheme.headingStyle(fontSize: 20)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildPeriodSelector(),
-            const SizedBox(height: 32),
-            _buildMonthlyReportHeader(),
-            const SizedBox(height: 40),
-            Center(child: _buildDonutChart()),
-            const SizedBox(height: 40),
-            _buildSmartInsightCard(),
-            const SizedBox(height: 32),
-            _buildBreakdownList(),
-            const SizedBox(height: 40),
-          ],
-        ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: FirestoreService.instance.streamUserTransactions(AuthService.instance.currentUid),
+        builder: (context, snapshot) {
+          final allTransactions = snapshot.data ?? FirestoreService.instance.getCachedTransactions(AuthService.instance.currentUid);
+          final txs = _filterTransactions(allTransactions);
+          
+          double totalSpent = 0;
+          Map<String, double> categorySums = {};
+          for (var t in txs) {
+            final amount = (t['amount'] as num?)?.toDouble() ?? 0.0;
+            final cat = (t['title'] as String?) ?? 'Other';
+            totalSpent += amount;
+            categorySums[cat] = (categorySums[cat] ?? 0.0) + amount;
+          }
+          
+          final sortedCategories = categorySums.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+          
+          final name = AuthService.instance.currentUser?.displayName?.split(' ').first ?? 'User';
+          final topCategory = sortedCategories.isNotEmpty ? sortedCategories.first.key : 'general';
+          final smartInsight = 'Hey $name, you spent the most on $topCategory this ${_selectedPeriod.toLowerCase()}. Consider reviewing your budget to stay on track.';
+          
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildPeriodSelector(),
+                const SizedBox(height: 32),
+                _buildMonthlyReportHeader(),
+                const SizedBox(height: 40),
+                Center(child: _buildDonutChart(totalSpent, sortedCategories)),
+                const SizedBox(height: 40),
+                _buildSmartInsightCard(smartInsight),
+                const SizedBox(height: 32),
+                _buildBreakdownList(totalSpent, sortedCategories),
+                const SizedBox(height: 40),
+              ],
+            ),
+          );
+        }
       ),
     );
   }
@@ -50,30 +118,34 @@ class SpendingAnalyticsScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _buildPeriodButton('Week', false),
-          _buildPeriodButton('Month', true),
-          _buildPeriodButton('Year', false),
+          _buildPeriodButton('Week'),
+          _buildPeriodButton('Month'),
+          _buildPeriodButton('Year'),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodButton(String label, bool isSelected) {
+  Widget _buildPeriodButton(String label) {
+    final isSelected = _selectedPeriod == label;
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)] : null,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? AppColors.kinInk : Colors.grey[600],
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 14,
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedPeriod = label),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: isSelected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)] : null,
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppColors.kinInk : Colors.grey[600],
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
             ),
           ),
         ),
@@ -85,14 +157,14 @@ class SpendingAnalyticsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Monthly Report', style: AppTheme.headingStyle(fontSize: 24)),
+        Text('$_selectedPeriod Report', style: AppTheme.headingStyle(fontSize: 24)),
         const SizedBox(height: 4),
-        Text('May 1 - May 31, 2026', style: TextStyle(color: Colors.grey[500], fontSize: 14)),
+        Text(_getPeriodSubtitle(), style: TextStyle(color: Colors.grey[500], fontSize: 14)),
       ],
     );
   }
 
-  Widget _buildDonutChart() {
+  Widget _buildDonutChart(double total, List<MapEntry<String, double>> categories) {
     return SizedBox(
       width: 200,
       height: 200,
@@ -101,13 +173,13 @@ class SpendingAnalyticsScreen extends StatelessWidget {
         children: [
           CustomPaint(
             size: const Size(200, 200),
-            painter: DonutChartPainter(),
+            painter: DonutChartPainter(total, categories),
           ),
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Total Spent', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-              Text('£2,450.00', style: AppTheme.headingStyle(fontSize: 24)),
+              Text(CurrencyService.instance.format(total), style: AppTheme.headingStyle(fontSize: 24)),
             ],
           ),
         ],
@@ -115,7 +187,7 @@ class SpendingAnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSmartInsightCard() {
+  Widget _buildSmartInsightCard(String insight) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -139,7 +211,7 @@ class SpendingAnalyticsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Camille, your dining expenses are 12% higher this month. Consider setting a weekly cap to stay on track for your vacation goal.',
+            insight,
             style: TextStyle(color: Colors.grey[800], fontSize: 13, height: 1.5),
           ),
         ],
@@ -147,16 +219,23 @@ class SpendingAnalyticsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBreakdownList() {
-    final data = [
-      {'name': 'Groceries', 'percent': '40%', 'amount': '£980.00', 'trend': '-4%', 'isUp': false, 'color': Colors.teal[400]},
-      {'name': 'Eating Out', 'percent': '25%', 'amount': '£612.50', 'trend': '+12%', 'isUp': true, 'color': Colors.orange[400]},
-      {'name': 'Travel', 'percent': '20%', 'amount': '£490.00', 'trend': '-2%', 'isUp': false, 'color': Colors.blue[400]},
-      {'name': 'Bills', 'percent': '15%', 'amount': '£367.50', 'trend': '0%', 'isUp': null, 'color': Colors.purple[400]},
+  Widget _buildBreakdownList(double total, List<MapEntry<String, double>> categories) {
+    final colors = [
+      Colors.teal[400],
+      Colors.orange[400],
+      Colors.blue[400],
+      Colors.purple[400],
+      Colors.brown[400],
+      Colors.pink[400],
     ];
-
+    
     return Column(
-      children: data.map((item) {
+      children: categories.asMap().entries.map((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        final color = colors[index % colors.length];
+        final percent = total > 0 ? (item.value / total * 100).toStringAsFixed(0) : '0';
+        
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
           padding: const EdgeInsets.all(16),
@@ -170,41 +249,22 @@ class SpendingAnalyticsScreen extends StatelessWidget {
               Container(
                 width: 12,
                 height: 12,
-                decoration: BoxDecoration(color: item['color'] as Color, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item['name'] as String, style: AppTheme.headingStyle(fontSize: 15)),
-                    Text('${item['percent']} of total spending', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                    Text(item.key, style: AppTheme.headingStyle(fontSize: 15)),
+                    Text('$percent% of total spending', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                   ],
                 ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(item['amount'] as String, style: AppTheme.dataStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                  Row(
-                    children: [
-                      if (item['isUp'] != null)
-                        Icon(
-                          item['isUp'] == true ? Icons.trending_up : Icons.trending_down,
-                          size: 14,
-                          color: item['isUp'] == true ? Colors.red : Colors.green,
-                        ),
-                      const SizedBox(width: 4),
-                      Text(
-                        item['trend'] as String,
-                        style: TextStyle(
-                          color: item['isUp'] == null ? Colors.grey : (item['isUp'] == true ? Colors.red : Colors.green),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                  Text(CurrencyService.instance.format(item.value), style: AppTheme.dataStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -216,34 +276,50 @@ class SpendingAnalyticsScreen extends StatelessWidget {
 }
 
 class DonutChartPainter extends CustomPainter {
+  final double total;
+  final List<MapEntry<String, double>> categories;
+  
+  DonutChartPainter(this.total, this.categories);
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final strokeWidth = 25.0;
+    const strokeWidth = 25.0;
     final rect = Rect.fromCircle(center: center, radius: radius - (strokeWidth / 2));
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
+      
+    if (total == 0 || categories.isEmpty) {
+      paint.color = Colors.grey[200]!;
+      canvas.drawArc(rect, 0, 2 * math.pi, false, paint);
+      return;
+    }
 
-    final data = [
-      {'percent': 0.40, 'color': Colors.teal[400]},
-      {'percent': 0.25, 'color': Colors.orange[400]},
-      {'percent': 0.20, 'color': Colors.blue[400]},
-      {'percent': 0.15, 'color': Colors.purple[400]},
+    final colors = [
+      Colors.teal[400],
+      Colors.orange[400],
+      Colors.blue[400],
+      Colors.purple[400],
+      Colors.brown[400],
+      Colors.pink[400],
     ];
 
     double startAngle = -math.pi / 2;
-    for (var item in data) {
-      final sweepAngle = (item['percent'] as double) * 2 * math.pi;
-      paint.color = item['color'] as Color;
+    for (int i = 0; i < categories.length; i++) {
+      final item = categories[i];
+      final sweepAngle = (item.value / total) * 2 * math.pi;
+      paint.color = colors[i % colors.length]!;
       canvas.drawArc(rect, startAngle + 0.05, sweepAngle - 0.1, false, paint);
       startAngle += sweepAngle;
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant DonutChartPainter oldDelegate) {
+    return oldDelegate.total != total || oldDelegate.categories != categories;
+  }
 }

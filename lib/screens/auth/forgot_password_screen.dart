@@ -46,7 +46,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceAll(RegExp(r'\[.*?\]'), '').trim();
+          _errorMessage = AuthService.parseAuthError(e);
         });
       }
     }

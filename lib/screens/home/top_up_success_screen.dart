@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
@@ -27,7 +27,7 @@ class TopUpSuccessScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '£${amount.toStringAsFixed(2)} is now ready to send or\nspend.',
+                'J\$${amount.toStringAsFixed(2)} is now ready to send or\nspend.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
               ),
@@ -110,7 +110,7 @@ class TopUpSuccessScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
                     children: [
-                      Text('£', style: AppTheme.headingStyle(fontSize: 24, color: Colors.white)),
+                      Text('J\$', style: AppTheme.headingStyle(fontSize: 24, color: Colors.white)),
                       const SizedBox(width: 4),
                       Text(bal.toStringAsFixed(2), style: AppTheme.headingStyle(fontSize: 40, color: Colors.white)),
                     ],

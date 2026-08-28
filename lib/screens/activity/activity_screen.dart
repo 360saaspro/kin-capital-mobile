@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
@@ -148,7 +148,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           final amt = (tx['amount'] as num?)?.toDouble() ?? 0.0;
                           final type = tx['type'] ?? 'payment';
                           final isNegative = amt < 0;
-                          final amountText = isNegative ? '- £${amt.abs().toStringAsFixed(2)}' : '+ £${amt.toStringAsFixed(2)}';
+                          final amountText = isNegative ? '- J\$${amt.abs().toStringAsFixed(2)}' : '+ J\$${amt.toStringAsFixed(2)}';
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -181,7 +181,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           context,
           title: 'Top Up Deposit',
           time: 'Today 10:45 AM • Received',
-          amount: '+ £250.00',
+          amount: '+ J\$250.00',
           icon: Icons.add_circle_outline,
         ),
         const SizedBox(height: 12),
@@ -189,7 +189,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           context,
           title: 'Camille Stevenson',
           time: 'Yesterday 04:20 PM • Sent',
-          amount: '- £100.00',
+          amount: '- J\$100.00',
           icon: Icons.swap_horiz,
         ),
       ],

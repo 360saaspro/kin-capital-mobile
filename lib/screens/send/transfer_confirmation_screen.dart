@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -52,7 +52,7 @@ class TransferConfirmationScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 48),
               child: Text(
-                '£$amount is on its way to $recipientName. She\'ll be notified now.',
+                'J\$$amount is on its way to $recipientName. She\'ll be notified now.',
                 textAlign: TextAlign.center,
                 style: AppTheme.bodyStyle(fontSize: 16, color: Colors.grey[700]),
               ),
@@ -83,7 +83,7 @@ class TransferConfirmationScreen extends StatelessWidget {
                       children: [
                         Text('Amount', style: AppTheme.bodyStyle(fontSize: 14, color: Colors.grey)),
                         Text(
-                          '£$amount.00',
+                          'J\$$amount.00',
                           style: AppTheme.dataStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,

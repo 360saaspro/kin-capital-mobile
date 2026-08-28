@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
@@ -110,7 +110,7 @@ class _TopUpAmountScreenState extends State<TopUpAmountScreen> {
             stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
             builder: (context, snapshot) {
               final bal = (snapshot.data?['balance'] as num?)?.toDouble() ?? 0.00;
-              return Text('Current Balance: £${bal.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[500], fontSize: 13));
+              return Text('Current Balance: J\$${bal.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[500], fontSize: 13));
             },
           ),
           const Spacer(),
@@ -154,7 +154,7 @@ class _TopUpAmountScreenState extends State<TopUpAmountScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('£', style: AppTheme.headingStyle(fontSize: 32, color: AppColors.primaryTeal)),
+        Text('J\$', style: AppTheme.headingStyle(fontSize: 32, color: AppColors.primaryTeal)),
         const SizedBox(width: 8),
         Text(
           _amount.isEmpty ? '0' : _amount,
@@ -209,11 +209,11 @@ class _TopUpAmountScreenState extends State<TopUpAmountScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildChip('+£50', 50),
+        _buildChip('+J\$50', 50),
         const SizedBox(width: 12),
-        _buildChip('+£100', 100),
+        _buildChip('+J\$100', 100),
         const SizedBox(width: 12),
-        _buildChip('+£500', 500),
+        _buildChip('+J\$500', 500),
       ],
     );
   }

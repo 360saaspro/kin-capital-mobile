@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString().replaceAll(RegExp(r'\[.*?\]'), '').trim();
+          _errorMessage = AuthService.parseAuthError(e);
         });
       }
     }

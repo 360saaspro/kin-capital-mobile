@@ -31,6 +31,20 @@
 
   <title>kin_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Pre-initialize Firebase Modular SDK to avoid firebase_core_web DDC crash -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    initializeApp({
+      apiKey: "AIzaSyCqzbygXnRa0xBlaaz24mg0LBj22AC0KDA",
+      authDomain: "kin-banking.firebaseapp.com",
+      projectId: "kin-banking",
+      storageBucket: "kin-banking.firebasestorage.app",
+      messagingSenderId: "381692013422",
+      appId: "1:381692013422:web:4a43802bba2af8d0e7ef7f",
+      measurementId: "G-C7Y7W8QTV5"
+    });
+  </script>
 </head>
 <body>
   <!--

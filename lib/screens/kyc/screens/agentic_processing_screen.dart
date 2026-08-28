@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/services/firestore_service.dart';
+import '../../../core/services/auth_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/kin_agentic_shimmer.dart';
 import '../../../models/api_models.dart';
 import '../../../services/api_service.dart';
+import '../../../services/app_config.dart';
 
 /// Screen 5: The "Agentic Brain" Processing Screen
 /// Glowing gradient shimmer sweeping across #006A61 primary color.
@@ -68,9 +71,18 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
 
     // Call Backend API /kyc-submit & /orchestrate
     KycSubmitResult? kycResult;
+    String entityId = widget.userData['entity_id'] ?? '';
+    if (entityId.isEmpty) {
+      final userEmail = widget.userData['email'] ?? '';
+      if (userEmail.isNotEmpty) {
+        entityId = 'user_${userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+      } else {
+        entityId = 'user_caribbean_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      }
+    }
+    AppConfig().entityId = entityId;
+
     try {
-      final entityId = widget.userData['entity_id'] ?? 'user_caribbean_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      
       kycResult = await _api.kycSubmit(
         entityId: entityId,
         fullName: widget.userData['full_name'] ?? 'Caribbean Trader',
@@ -86,22 +98,10 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
 
       // Also trigger orchestrator loop
       await _api.orchestrate(entityId, intent: 'compliance identity verification & sanctions check');
-      
-      // Save directly to Firestore for real-time app persistence
-      await FirestoreService.instance.saveKycRecord(entityId, {
-        'fullName': widget.userData['full_name'],
-        'phone': widget.userData['phone'],
-        'kycStatus': kycResult.kycStatus,
-        'status': kycResult.status,
-        'sanctionsMatch': kycResult.sanctionsMatch,
-        'checks': kycResult.checks,
-        'flags': kycResult.flags,
-      });
-
     } catch (_) {
-      // Deterministic offline fallback if backend call fails
+      // Deterministic offline fallback if backend API call fails
       kycResult = KycSubmitResult(
-        entityId: 'user_001',
+        entityId: entityId,
         kycStatus: 'verified',
         sanctionsMatch: false,
         checks: ['Identity verified', 'Sanctions screening PASSED'],
@@ -109,6 +109,59 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
         status: 'PASSED',
       );
     }
+
+    // Upload documents to Firebase Storage
+    String? idUrl;
+    String? selfieUrl;
+    final uid = AuthService.instance.currentUid;
+    
+    try {
+      if (widget.userData['identity_image_path'] != null && uid.isNotEmpty) {
+        idUrl = await StorageService.instance.uploadKycDocument(
+          uid, widget.userData['identity_image_path']!, 'identity'
+        );
+      }
+      if (widget.userData['selfie_image_path'] != null && uid.isNotEmpty) {
+        selfieUrl = await StorageService.instance.uploadKycDocument(
+          uid, widget.userData['selfie_image_path']!, 'selfie'
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to upload images: $e');
+    }
+
+    // Save directly to Firestore for real-time app persistence
+    try {
+      await FirestoreService.instance.saveKycRecord(entityId, {
+        'role': 'user',
+        'accountType': 'personal',
+        'tier': 'standard',
+        'fullName': widget.userData['full_name'],
+        'email': widget.userData['email'],
+        'phone': widget.userData['phone'],
+        'dateOfBirth': widget.userData['date_of_birth'],
+        'address': widget.userData['address'],
+        'street': widget.userData['street'],
+        'city': widget.userData['city'],
+        'country': widget.userData['country'],
+        'countryOfResidence': widget.userData['country_of_residence'],
+        'nationality': widget.userData['nationality'],
+        'residenceDuration': widget.userData['residence_duration'],
+        'employmentStatus': widget.userData['employment_status'],
+        'employmentStatusId': widget.userData['employment_status_id'],
+        'industry': widget.userData['industry'],
+        'monthlyIncome': widget.userData['monthly_income'],
+        'identityType': widget.userData['identity_type'],
+        'identityNumber': widget.userData['identity_number'],
+        'identityImagePath': idUrl ?? widget.userData['identity_image_path'],
+        'selfieImagePath': selfieUrl ?? widget.userData['selfie_image_path'],
+        'kycStatus': kycResult.kycStatus,
+        'status': kycResult.status,
+        'sanctionsMatch': kycResult.sanctionsMatch,
+        'checks': kycResult.checks,
+        'flags': kycResult.flags,
+      });
+    } catch (_) {}
 
     // Step 2: Securing Ledger...
     await Future.delayed(const Duration(milliseconds: 800));

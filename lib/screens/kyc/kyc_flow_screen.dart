@@ -5,6 +5,8 @@ import 'screens/splash_verification_screen.dart';
 import 'screens/friendly_data_capture_screen.dart';
 import 'screens/address_capture_screen.dart';
 import 'screens/employment_status_screen.dart';
+import 'screens/document_type_selection_screen.dart';
+import 'screens/biometric_liveness_screen.dart';
 import 'screens/document_upload_modal.dart';
 import 'screens/document_scanner_screen.dart';
 import 'screens/agentic_processing_screen.dart';
@@ -16,9 +18,9 @@ import 'widgets/ocr_retry_sheet.dart';
 /// Manages 5-step progression:
 ///   Step 1: Personal Details & Contact (validation, email, Caribbean dial code, calendar DOB picker)
 ///   Step 2: Address & Residence Duration (address autofill suggestions, duration selector)
-///   Step 3: Employment & Financial Profile (employment status, industry, monthly cash flow)
-///   Step 4: RegTech Document Upload & Camera Scanner
-///   Step 5: Agentic Brain Processing Screen (/kyc-submit, /orchestrate & green checkmark bloom)
+///   Step 3: Employment & Financial Profile (employment status, industry, JMD $ cash flow)
+///   Step 4: Government ID Document Selection & Live Camera Scanner with ID-specific framing
+///   Step 5: Biometric Liveness & Agentic Brain Processing Screen (/kyc-submit, /orchestrate & green checkmark bloom)
 class KycFlowScreen extends StatefulWidget {
   const KycFlowScreen({super.key});
 
@@ -27,8 +29,9 @@ class KycFlowScreen extends StatefulWidget {
 }
 
 class _KycFlowScreenState extends State<KycFlowScreen> {
-  int _currentStep = 0; // 0: Splash, 1: Step 1, 2: Step 2, 3: Step 3, 4: Step 4 (Scanner), 5: Step 5 (Agentic), 6: Human Escalation
+  int _currentStep = 0; // 0: Splash, 1: Step 1, 2: Step 2, 3: Step 3, 4: Step 4 (ID Type), 5: Step 5 (Agentic), 6: Human Escalation
   final Map<String, String> _kycData = {};
+  DocumentType _selectedDocType = DocumentType.nationalId;
 
   // Step 0 Complete: Splash -> Move to Step 1
   void _onSplashVerified() {
@@ -53,42 +56,62 @@ class _KycFlowScreenState extends State<KycFlowScreen> {
     });
   }
 
-  // Step 3 Complete: Employment Captured -> Trigger Step 4 Document Upload
-  void _onStep3Captured(Map<String, String> employmentData) async {
+  // Step 3 Complete: Employment Captured -> Move to Step 4 (Document Selection Screen)
+  void _onStep3Captured(Map<String, String> employmentData) {
     _kycData.addAll(employmentData);
+    setState(() {
+      _currentStep = 4;
+    });
+  }
 
-    // Open Step 4 Document Selector Bottom Sheet
-    final selectedType = await DocumentUploadModal.show(context);
-    if (selectedType != null) {
-      _kycData['identity_type'] = selectedType.apiKey;
+  // Step 4 Complete: Document Type Selected -> Launch Live Camera Document Scanner
+  void _onStep4DocumentSelected(DocumentType selectedType) {
+    _selectedDocType = selectedType;
+    _kycData['identity_type'] = selectedType.apiKey;
 
-      if (!mounted) return;
-      // Open Document Scanner Screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentScannerScreen(
-            docType: selectedType,
-            onScanSuccess: (docNum) {
-              _kycData['identity_number'] = docNum;
-              Navigator.pop(context); // Close scanner
-              setState(() {
-                _currentStep = 5; // Move directly to Step 5 (Agentic Processing)
-              });
-            },
-            onOcrFailed: () {
-              Navigator.pop(context); // Close scanner
-              _showOcrRetrySheet();
-            },
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DocumentScannerScreen(
+          docType: selectedType,
+          onScanSuccess: (docNum, imagePath) {
+            _kycData['identity_number'] = docNum;
+            if (imagePath != null) {
+              _kycData['identity_image_path'] = imagePath;
+            }
+            Navigator.pop(context); // Close document scanner
+
+            // Navigate to live front-camera Biometric Liveness & Selfie Screen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BiometricLivenessScreen(
+                  onLivenessSuccess: (selfiePath) {
+                    if (selfiePath != null) {
+                      _kycData['selfie_image_path'] = selfiePath;
+                    }
+                    Navigator.pop(context); // Close liveness screen
+
+                    setState(() {
+                      _currentStep = 5; // Move to Step 5 (Agentic Processing)
+                    });
+                  },
+                ),
+              ),
+            );
+          },
+          onOcrFailed: () {
+            Navigator.pop(context); // Close scanner
+            _showOcrRetrySheet();
+          },
         ),
-      );
-    }
+      ),
+    );
   }
 
   void _showOcrRetrySheet() {
     OcrRetrySheet.show(context, onRetake: () {
-      _onStep3Captured({});
+      _onStep4DocumentSelected(_selectedDocType);
     });
   }
 
@@ -119,6 +142,27 @@ class _KycFlowScreenState extends State<KycFlowScreen> {
     setState(() {
       _currentStep = 6;
     });
+  }
+
+  Widget _buildCurrentStep() {
+    switch (_currentStep) {
+      case 1:
+        return FriendlyDataCaptureScreen(onNext: _onStep1Captured);
+      case 2:
+        return AddressCaptureScreen(onNext: _onStep2Captured);
+      case 3:
+        return EmploymentStatusScreen(onNext: _onStep3Captured);
+      case 4:
+        return DocumentTypeSelectionScreen(onNext: _onStep4DocumentSelected);
+      case 5:
+        return AgenticProcessingScreen(
+          userData: _kycData,
+          onPass: _onKycPassed,
+          onFlagged: _onKycFlagged,
+        );
+      default:
+        return FriendlyDataCaptureScreen(onNext: _onStep1Captured);
+    }
   }
 
   @override
@@ -155,21 +199,7 @@ class _KycFlowScreenState extends State<KycFlowScreen> {
 
             // Active Step Content
             Expanded(
-              child: IndexedStack(
-                index: progressStep - 1,
-                children: [
-                  FriendlyDataCaptureScreen(onNext: _onStep1Captured),
-                  AddressCaptureScreen(onNext: _onStep2Captured),
-                  EmploymentStatusScreen(onNext: _onStep3Captured),
-                  // Step 4 Document Upload is launched via Modal Bottom Sheet
-                  EmploymentStatusScreen(onNext: _onStep3Captured),
-                  AgenticProcessingScreen(
-                    userData: _kycData,
-                    onPass: _onKycPassed,
-                    onFlagged: _onKycFlagged,
-                  ),
-                ],
-              ),
+              child: _buildCurrentStep(),
             ),
           ],
         ),
