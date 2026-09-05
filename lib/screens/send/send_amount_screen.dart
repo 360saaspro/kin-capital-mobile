@@ -150,6 +150,7 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -160,125 +161,131 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
         title: Text('Send Money', style: AppTheme.headingStyle(fontSize: 18)),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            children: [
-              const SizedBox(height: 24),
-              // Recipient Chip
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundImage: widget.avatarUrl != null ? NetworkImage(widget.avatarUrl!) : null,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(widget.recipientName, style: AppTheme.bodyStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 4),
-                    Text(widget.flagEmoji),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 48),
-
-              // Amount Input
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(currency.symbol, style: AppTheme.headingStyle(fontSize: 48, color: AppColors.primaryTeal)),
-                  SizedBox(
-                    width: 250,
-                    child: TextField(
-                      controller: _amountController,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      style: AppTheme.headingStyle(fontSize: 56, color: AppColors.primaryTeal),
-                      decoration: const InputDecoration(border: InputBorder.none),
-                      onChanged: (_) => _fetchRoute(),
-                    ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // Recipient Chip
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(30),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-              Text(
-                '${widget.recipientName} gets ${currency.symbol}${recipientAmount.toStringAsFixed(0)} JMD',
-                style: AppTheme.headingStyle(fontSize: 20),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'FEE: $feeDisplay • RATE: 1 ${currency.code} = $exchangeRate JMD',
-                style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.bolt, color: AppColors.primaryTeal, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    'VIA $routeName • ARRIVING IN $eta',
-                    style: AppTheme.bodyStyle(fontSize: 12, color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundImage: widget.avatarUrl != null ? NetworkImage(widget.avatarUrl!) : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(widget.recipientName, style: AppTheme.bodyStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 4),
+                      Text(widget.flagEmoji),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 28),
 
-              const Spacer(),
-
-              // Method Selector
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-                )
-              else
+                // Amount Input
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    _buildRouteOption(
-                      label: routeName,
-                      subtitle: '${feePct.toStringAsFixed(1)}% fee',
-                      saveText: feePct < 1 ? 'SAVES 90%' : null,
-                      selected: true,
-                    ),
-                    const SizedBox(width: 16),
-                    _buildRouteOption(
-                      label: 'MTO',
-                      subtitle: '7.5% fee',
-                      selected: false,
+                    Text(currency.symbol, style: AppTheme.headingStyle(fontSize: 48, color: AppColors.primaryTeal)),
+                    SizedBox(
+                      width: 250,
+                      child: TextField(
+                        controller: _amountController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        textInputAction: TextInputAction.done,
+                        textAlign: TextAlign.center,
+                        style: AppTheme.headingStyle(fontSize: 56, color: AppColors.primaryTeal),
+                        decoration: const InputDecoration(border: InputBorder.none),
+                        onChanged: (_) => _fetchRoute(),
+                        onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                      ),
                     ),
                   ],
                 ),
 
-              const SizedBox(height: 32),
+                const SizedBox(height: 12),
+                Text(
+                  '${widget.recipientName} gets ${currency.symbol}${recipientAmount.toStringAsFixed(0)} JMD',
+                  style: AppTheme.headingStyle(fontSize: 20),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'FEE: $feeDisplay • RATE: 1 ${currency.code} = $exchangeRate JMD',
+                  style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bolt, color: AppColors.primaryTeal, size: 16),
+                    const SizedBox(width: 4),
+                    Text(
+                      'VIA $routeName • ARRIVING IN $eta',
+                      style: AppTheme.bodyStyle(fontSize: 12, color: AppColors.primaryTeal, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
 
-              // Swipe Button
-              SwipeToSendButton(
-                text: '→ Swipe to send ${currency.symbol}${amount.toStringAsFixed(0)}',
-                onCompleted: () => _handleExecuteTransfer(amount),
-              ),
+                const Spacer(),
 
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.lock_outline, color: Colors.grey[400], size: 14),
-                  const SizedBox(width: 4),
-                  Text('SECURE END-TO-END ENCRYPTED TRANSFER',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[400], letterSpacing: 0.5, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 24),
-            ],
+                // Method Selector
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                else
+                  Row(
+                    children: [
+                      _buildRouteOption(
+                        label: routeName,
+                        subtitle: '${feePct.toStringAsFixed(1)}% fee',
+                        saveText: feePct < 1 ? 'SAVES 90%' : null,
+                        selected: true,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildRouteOption(
+                        label: 'MTO',
+                        subtitle: '7.5% fee',
+                        selected: false,
+                      ),
+                    ],
+                  ),
+
+                const SizedBox(height: 24),
+
+                // Swipe Button
+                SwipeToSendButton(
+                  text: '→ Swipe to send ${currency.symbol}${amount.toStringAsFixed(0)}',
+                  onCompleted: () => _handleExecuteTransfer(amount),
+                ),
+
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_outline, color: Colors.grey[400], size: 14),
+                    const SizedBox(width: 4),
+                    Text('SECURE END-TO-END ENCRYPTED TRANSFER',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[400], letterSpacing: 0.5, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),

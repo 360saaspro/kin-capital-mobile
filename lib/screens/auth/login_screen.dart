@@ -501,44 +501,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        const SizedBox(height: 24),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(child: Container(height: 1, color: Colors.grey[300])),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text('OR', style: TextStyle(color: Colors.grey[400], fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-            Expanded(child: Container(height: 1, color: Colors.grey[300])),
-          ],
-        ),
-
-        const SizedBox(height: 20),
-
-        Center(
-          child: Column(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.face_rounded, size: 44, color: AppColors.primaryTeal),
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MainScreen()),
-                    (route) => false,
-                  );
-                },
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Sign in with Face ID / Biometrics',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-
         const SizedBox(height: 28),
 
         // Don't have an account link

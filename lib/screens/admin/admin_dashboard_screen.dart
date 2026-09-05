@@ -228,20 +228,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       final isWide = box.maxWidth > 600;
       if (isWide) {
         return Row(
-          children: kpis.map((k) => Expanded(child: Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: _buildKpiCard(k),
-          ))).toList(),
+          children: kpis.asMap().entries.map((entry) {
+            final isLast = entry.key == kpis.length - 1;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: isLast ? 0 : 16),
+                child: _buildKpiCard(entry.value),
+              ),
+            );
+          }).toList(),
         );
       }
-      return GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.4,
-        children: kpis.map(_buildKpiCard).toList(),
+      return Column(
+        children: [
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildKpiCard(kpis[0])),
+                const SizedBox(width: 16),
+                Expanded(child: _buildKpiCard(kpis[1])),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildKpiCard(kpis[2])),
+                const SizedBox(width: 16),
+                Expanded(child: _buildKpiCard(kpis[3])),
+              ],
+            ),
+          ),
+        ],
       );
     });
   }
@@ -251,7 +272,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       animation: _kpiAnim ?? const AlwaysStoppedAnimation(1.0),
       builder: (ctx, _) {
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -262,6 +283,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Row(
                 children: [
@@ -278,17 +300,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       decoration: BoxDecoration(color: data.color.withValues(alpha: 0.5), shape: BoxShape.circle)),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 data.value,
                 style: GoogleFonts.jetBrainsMono(
-                  fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.kinInk,
+                  fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.kinInk,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(data.label, style: AppTheme.bodyStyle(fontSize: 13, color: Colors.grey[600]!)),
+              Text(
+                data.label,
+                style: AppTheme.bodyStyle(fontSize: 13, color: Colors.grey[600]!, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 2),
-              Text(data.subtitle, style: AppTheme.bodyStyle(fontSize: 11, color: Colors.grey[400]!)),
+              Text(
+                data.subtitle,
+                style: AppTheme.bodyStyle(fontSize: 11, color: Colors.grey[400]!),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         );
