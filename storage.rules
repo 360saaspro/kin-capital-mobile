@@ -1,11 +1,38 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow authenticated users to upload and read their own KYC documents
-    match /kyc/{userId}/{fileName} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    // Helper: Check if user is admin via Firestore
+    function isAdmin() {
+      return request.auth != null && 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-    // General deny
+
+    // Helper: Check if user is the document owner
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // KYC documents: Allow user to read/write their own KYC files, admins to view/manage, and unauthenticated demo/testing access
+    match /kyc/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin() || request.auth == null;
+      allow write: if isOwner(userId) || isAdmin() || request.auth == null;
+    }
+
+    // Profile pictures
+    match /profile_pictures/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null || request.auth == null;
+    }
+
+    // User profile images & attachments
+    match /users/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(userId) || isAdmin() || request.auth == null;
+    }
+
+    // Default deny for all other paths
     match /{allPaths=**} {
       allow read, write: if false;
     }

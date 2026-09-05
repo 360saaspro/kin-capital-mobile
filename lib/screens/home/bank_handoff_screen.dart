@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-
+import '../../core/services/auth_service.dart';
 class BankHandoffScreen extends StatefulWidget {
   final String bankName;
-  const BankHandoffScreen({super.key, this.bankName = 'Lloyds Bank'});
+  const BankHandoffScreen({super.key, this.bankName = 'Your Bank'});
 
   @override
   State<BankHandoffScreen> createState() => _BankHandoffScreenState();
@@ -55,7 +55,7 @@ class _BankHandoffScreenState extends State<BankHandoffScreen> {
               const SizedBox(height: 20),
               Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Camille', style: AppTheme.headingStyle(fontSize: 18, color: AppColors.primaryTeal)),
+                child: Text(AuthService.instance.currentUser?.displayName?.split(' ').first ?? 'User', style: AppTheme.headingStyle(fontSize: 18, color: AppColors.primaryTeal)),
               ),
               const Spacer(),
               _buildLoadingAnimation(),

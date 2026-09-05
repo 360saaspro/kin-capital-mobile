@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/services/firestore_service.dart';
 import '../../../core/services/auth_service.dart';
@@ -73,11 +74,16 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
     KycSubmitResult? kycResult;
     String entityId = widget.userData['entity_id'] ?? '';
     if (entityId.isEmpty) {
-      final userEmail = widget.userData['email'] ?? '';
-      if (userEmail.isNotEmpty) {
-        entityId = 'user_${userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+      final currentUid = AuthService.instance.currentUid;
+      if (currentUid.isNotEmpty && !currentUid.startsWith('user_')) {
+        entityId = currentUid;
       } else {
-        entityId = 'user_caribbean_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+        final userEmail = widget.userData['email'] ?? '';
+        if (userEmail.isNotEmpty) {
+          entityId = 'user_${userEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+        } else {
+          entityId = 'user_caribbean_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+        }
       }
     }
     AppConfig().entityId = entityId;
@@ -113,21 +119,28 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
     // Upload documents to Firebase Storage
     String? idUrl;
     String? selfieUrl;
-    final uid = AuthService.instance.currentUid;
-    
-    try {
-      if (widget.userData['identity_image_path'] != null && uid.isNotEmpty) {
-        idUrl = await StorageService.instance.uploadKycDocument(
-          uid, widget.userData['identity_image_path']!, 'identity'
-        );
+    final targetUid = (AuthService.instance.currentUser?.uid.isNotEmpty ?? false)
+        ? AuthService.instance.currentUser!.uid
+        : (entityId.isNotEmpty ? entityId : AuthService.instance.currentUid);
+
+    final rawIdPath = widget.userData['identity_image_path'];
+    if (rawIdPath != null && rawIdPath.isNotEmpty && targetUid.isNotEmpty) {
+      try {
+        debugPrint('[AgenticProcessingScreen] Uploading identity document from $rawIdPath for uid: $targetUid');
+        idUrl = await StorageService.instance.uploadKycDocument(targetUid, rawIdPath, 'identity');
+      } catch (e) {
+        debugPrint('[AgenticProcessingScreen] Failed to upload identity image: $e');
       }
-      if (widget.userData['selfie_image_path'] != null && uid.isNotEmpty) {
-        selfieUrl = await StorageService.instance.uploadKycDocument(
-          uid, widget.userData['selfie_image_path']!, 'selfie'
-        );
+    }
+
+    final rawSelfiePath = widget.userData['selfie_image_path'];
+    if (rawSelfiePath != null && rawSelfiePath.isNotEmpty && targetUid.isNotEmpty) {
+      try {
+        debugPrint('[AgenticProcessingScreen] Uploading selfie image from $rawSelfiePath for uid: $targetUid');
+        selfieUrl = await StorageService.instance.uploadKycDocument(targetUid, rawSelfiePath, 'selfie');
+      } catch (e) {
+        debugPrint('[AgenticProcessingScreen] Failed to upload selfie image: $e');
       }
-    } catch (e) {
-      debugPrint('Failed to upload images: $e');
     }
 
     // Save directly to Firestore for real-time app persistence
@@ -153,14 +166,33 @@ class _AgenticProcessingScreenState extends State<AgenticProcessingScreen>
         'monthlyIncome': widget.userData['monthly_income'],
         'identityType': widget.userData['identity_type'],
         'identityNumber': widget.userData['identity_number'],
-        'identityImagePath': idUrl ?? widget.userData['identity_image_path'],
-        'selfieImagePath': selfieUrl ?? widget.userData['selfie_image_path'],
+        'identityImagePath': idUrl ?? (rawIdPath != null && rawIdPath.startsWith('http') ? rawIdPath : null),
+        'selfieImagePath': selfieUrl ?? (rawSelfiePath != null && rawSelfiePath.startsWith('http') ? rawSelfiePath : null),
         'kycStatus': kycResult.kycStatus,
         'status': kycResult.status,
         'sanctionsMatch': kycResult.sanctionsMatch,
         'checks': kycResult.checks,
         'flags': kycResult.flags,
       });
+
+      // Generate random virtual card for the new user
+      final random = math.Random();
+      final cardNumber = '5540 ${(random.nextInt(9000) + 1000).toString().padLeft(4, '0')} ${(random.nextInt(9000) + 1000).toString().padLeft(4, '0')} ${(random.nextInt(9000) + 1000).toString().padLeft(4, '0')}';
+      final expMonth = (DateTime.now().month).toString().padLeft(2, '0');
+      final expYear = (DateTime.now().year + 4).toString().substring(2);
+      final cvv = (random.nextInt(900) + 100).toString();
+
+      final cardsRef = FirestoreService.instance.usersCollection?.doc(entityId).collection('cards');
+      if (cardsRef != null) {
+        await cardsRef.doc('virtual_card_1').set({
+          'cardNumber': cardNumber,
+          'expiry': '$expMonth/$expYear',
+          'cvv': cvv,
+          'cardType': 'virtual',
+          'isFrozen': false,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
     } catch (_) {}
 
     // Step 2: Securing Ledger...

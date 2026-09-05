@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../premium/kin_plus_screen.dart';
 import 'spending_analytics_screen.dart';
 import '../home/notifications_screen.dart';
 import 'card_management_screen.dart';
-import 'dart:io';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/currency_service.dart';
@@ -17,6 +17,15 @@ class CardsScreen extends StatefulWidget {
   @override
   State<CardsScreen> createState() => _CardsScreenState();
 }
+
+class _CardsScreenState extends State<CardsScreen> {
+  bool isFrozen = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AuthService.instance.ensureAccountDetailsGenerated();
+  }
 
   String _greeting() {
     final hour = DateTime.now().hour;
@@ -31,58 +40,74 @@ class CardsScreen extends StatefulWidget {
     return '';
   }
 
-  void _showCardDetails() {
+  void _showCardDetails(String cardNumber, String expiry, String cvv) {
+    bool isCvvVisible = false;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
-              ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            padding: const EdgeInsets.all(32),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
-            const SizedBox(height: 32),
-            Text('Card Details', style: AppTheme.headingStyle(fontSize: 24)),
-            const SizedBox(height: 32),
-            _buildDetailRow('Card Number', '5540 8840 1234 5678', isCopyable: true),
-            const SizedBox(height: 24),
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _buildDetailRow('Expiry', '12/28')),
-                const SizedBox(width: 24),
-                Expanded(child: _buildDetailRow('CVV', '•••', isSecure: true)),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text('Card Details', style: AppTheme.headingStyle(fontSize: 24)),
+                const SizedBox(height: 32),
+                _buildDetailRow('Card Number', cardNumber, isCopyable: true),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: _buildDetailRow('Expiry', expiry)),
+                    const SizedBox(width: 24),
+                    Expanded(child: _buildDetailRow(
+                      'CVV', 
+                      isCvvVisible ? cvv : '•••', 
+                      isSecure: true,
+                      onSecureTap: () {
+                        setModalState(() {
+                          isCvvVisible = !isCvvVisible;
+                        });
+                      },
+                      isCvvVisible: isCvvVisible,
+                    )),
+                  ],
+                ),
+                const SizedBox(height: 48),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: AppTheme.buttonStyle(backgroundColor: AppColors.primaryTeal),
+                    child: const Text('Close'),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
-            const SizedBox(height: 48),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: AppTheme.buttonStyle(backgroundColor: AppColors.primaryTeal),
-                child: const Text('Close'),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isCopyable = false, bool isSecure = false}) {
+  Widget _buildDetailRow(String label, String value, {bool isCopyable = false, bool isSecure = false, VoidCallback? onSecureTap, bool? isCvvVisible}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -98,7 +123,14 @@ class CardsScreen extends StatefulWidget {
             if (isCopyable)
               Icon(Icons.copy, color: AppColors.primaryTeal, size: 20),
             if (isSecure)
-              Icon(Icons.visibility_outlined, color: AppColors.primaryTeal, size: 20),
+              GestureDetector(
+                onTap: onSecureTap,
+                child: Icon(
+                  isCvvVisible == true ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: AppColors.primaryTeal, 
+                  size: 20,
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -114,11 +146,21 @@ class CardsScreen extends StatefulWidget {
       body: BrandedBackground(
         opacity: 0.04,
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: StreamBuilder<List<Map<String, dynamic>>>(
+            stream: FirestoreService.instance.streamUserCards(AuthService.instance.currentUid),
+            builder: (context, snapshot) {
+              final cards = snapshot.data ?? [];
+              final card = cards.isNotEmpty ? cards.first : null;
+              final cardNumber = card?['cardNumber'] as String? ?? '5540 8840 1234 5678';
+              final cardExpiry = card?['expiry'] as String? ?? '12/28';
+              final cardCvv = card?['cvv'] as String? ?? '123';
+              final last4 = cardNumber.length >= 4 ? cardNumber.substring(cardNumber.length - 4) : '8840';
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 const SizedBox(height: 16),
                 // Header
                 Row(
@@ -126,19 +168,31 @@ class CardsScreen extends StatefulWidget {
                   children: [
                     Row(
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                        StreamBuilder<Map<String, dynamic>?>(
+                          stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
+                          builder: (context, snapshot) {
+                            final profile = snapshot.data ?? FirestoreService.instance.getCachedUser(AuthService.instance.currentUid);
+                            final rawPhotoUrl = AuthService.instance.fallbackPhotoUrl ?? profile?['photoURL'] ?? AuthService.instance.currentUser?.photoURL;
+                            
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                );
+                              },
+                              child: CircleAvatar(
+                                radius: 20,
+                                backgroundColor: AppColors.primaryTeal,
+                                backgroundImage: rawPhotoUrl != null 
+                                    ? (rawPhotoUrl.toString().startsWith('data:image')
+                                        ? MemoryImage(base64Decode(rawPhotoUrl.toString().split(',').last)) as ImageProvider
+                                        : NetworkImage(rawPhotoUrl))
+                                    : null,
+                                child: rawPhotoUrl == null ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
+                              ),
                             );
-                          },
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundImage: AuthService.instance.currentUser?.photoURL != null
-                                ? NetworkImage(AuthService.instance.currentUser!.photoURL!)
-                                : const NetworkImage('https://i.pravatar.cc/150?u=maya'),
-                          ),
+                          }
                         ),
                         const SizedBox(width: 12),
                         Text(
@@ -241,29 +295,28 @@ class CardsScreen extends StatefulWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  // Kin Leaf Logo
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Kin Logo
+                                    Image.asset(
+                                      'assets/images/kin_logo.png',
+                                      width: 60,
+                                      height: 60,
+                                      color: Colors.white, // assuming the logo works well as a white overlay
                                     ),
-                                    child: const Icon(Icons.eco, color: Colors.amber, size: 20),
-                                  ),
-                                  // Chip
-                                  Container(
-                                    height: 35,
-                                    width: 50,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(8),
+                                    Row(
+                                      children: [
+                                        // Contactless Icon
+                                        const RotatedBox(
+                                          quarterTurns: 1,
+                                          child: Icon(Icons.wifi, color: Colors.white70, size: 28),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
-                              ),
+                                  ],
+                                ),
                               const Spacer(),
                               Text(
                                 'CARDHOLDER',
@@ -287,7 +340,7 @@ class CardsScreen extends StatefulWidget {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    '•••• 8840',
+                                    '•••• $last4',
                                     style: AppTheme.dataStyle(
                                       color: Colors.white.withValues(alpha: 0.8),
                                       fontSize: 18,
@@ -339,9 +392,51 @@ class CardsScreen extends StatefulWidget {
                 _buildActionButton(
                   Icons.visibility_outlined,
                   'Card details',
-                  onTap: _showCardDetails,
+                  onTap: () => _showCardDetails(cardNumber, cardExpiry, cardCvv),
                 ),
                 
+                const SizedBox(height: 32),
+
+                // Account Information Section
+                StreamBuilder<Map<String, dynamic>?>(
+                  stream: FirestoreService.instance.streamUserProfile(AuthService.instance.currentUid),
+                  builder: (context, profileSnapshot) {
+                    final profile = profileSnapshot.data ?? FirestoreService.instance.getCachedUser(AuthService.instance.currentUid);
+                    final accountNumber = profile?['accountNumber'] as String? ?? 'Pending...';
+                    final transitBankCode = profile?['transitBankCode'] as String? ?? 'Pending...';
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.account_balance, color: AppColors.primaryTeal),
+                              const SizedBox(width: 12),
+                              Text('Account Details', style: AppTheme.headingStyle(fontSize: 18)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          _buildAccountDetailRow('Account Number', accountNumber),
+                          const SizedBox(height: 16),
+                          _buildAccountDetailRow('Transit/Bank Code', transitBankCode),
+                        ],
+                      ),
+                    );
+                  }
+                ),
+
                 const SizedBox(height: 32),
                 
                 // Apple Pay / Google Wallet Button
@@ -356,7 +451,7 @@ class CardsScreen extends StatefulWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        Platform.isIOS ? 'Add to Apple Pay' : 'Add to Google Wallet',
+                        Theme.of(context).platform == TargetPlatform.iOS ? 'Add to Apple Pay' : 'Add to Google Wallet',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -364,7 +459,7 @@ class CardsScreen extends StatefulWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Icon(Platform.isIOS ? Icons.apple : Icons.wallet_outlined, color: Colors.white, size: 24),
+                      Icon(Theme.of(context).platform == TargetPlatform.iOS ? Icons.apple : Icons.wallet_outlined, color: Colors.white, size: 24),
                     ],
                   ),
                 ),
@@ -548,9 +643,30 @@ class CardsScreen extends StatefulWidget {
                 const SizedBox(height: 40),
               ],
             ),
-          ),
-        ),
+          );
+        }),
       ),
+    ));
+  }
+
+  Widget _buildAccountDetailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTheme.bodyStyle(color: Colors.grey, fontSize: 14)),
+        Row(
+          children: [
+            Text(value, style: AppTheme.dataStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                // Future: Add copy to clipboard
+              },
+              child: Icon(Icons.copy, color: AppColors.primaryTeal, size: 16),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

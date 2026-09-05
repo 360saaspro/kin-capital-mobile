@@ -119,6 +119,35 @@ class FirestoreService {
     } catch (_) {}
   }
 
+  /// Update the user's account status (e.g., active, suspended, locked)
+  Future<void> updateUserStatus(String uid, String status) async {
+    if (uid.isEmpty) return;
+    try {
+      await setUserProfile(uid, {
+        'accountStatus': status,
+      });
+    } catch (_) {}
+  }
+
+  /// Get Agentic Credit Settings
+  Stream<Map<String, dynamic>?> streamAgenticCreditSettings() {
+    if (db == null) return const Stream.empty();
+    return db!
+        .collection('admin_settings')
+        .doc('agentic_credit')
+        .snapshots()
+        .map((doc) => doc.data())
+        .handleError((_) => <String, dynamic>{});
+  }
+
+  /// Update Agentic Credit Settings
+  Future<void> updateAgenticCreditSettings(Map<String, dynamic> settings) async {
+    if (db == null) return;
+    try {
+      await db!.collection('admin_settings').doc('agentic_credit').set(settings, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
   /// Stream user profile for real-time updates
   Stream<Map<String, dynamic>?> streamUserProfile(String uid) {
     if (uid.isEmpty) return Stream.value(_userCache[uid]);
@@ -158,14 +187,20 @@ class FirestoreService {
     required String type, // e.g. 'deposit', 'transfer', 'withdrawal'
     required String title,
     Map<String, dynamic>? metadata,
+    String? currency,
   }) async {
     final nowIso = DateTime.now().toIso8601String();
+    // Resolve currency: explicit param > metadata field > CurrencyService current
+    final resolvedCurrency = currency
+        ?? (metadata?['currency'] as String?)
+        ?? _resolveCurrencyCode();
     final txData = {
       'userId': userId,
       'amount': amount,
       'type': type,
       'title': title,
       'createdAt': nowIso,
+      'currency': resolvedCurrency,
       ...?metadata,
     };
 
@@ -182,6 +217,16 @@ class FirestoreService {
       return null;
     }
   }
+
+  String _resolveCurrencyCode() {
+    try {
+      // CurrencyService is in the UI layer; use a safe fallback
+      return 'JMD';
+    } catch (_) {
+      return 'JMD';
+    }
+  }
+
 
   /// Get real-time stream of transactions for a user
   Stream<List<Map<String, dynamic>>> streamUserTransactions(String userId) {
@@ -211,6 +256,69 @@ class FirestoreService {
           .handleError((_) => _transactionsCache[userId] ?? []);
     } catch (_) {
       return Stream.value(_transactionsCache[userId] ?? []);
+    }
+  }
+
+  /// Flag a transaction for fraud or review
+  Future<void> flagTransaction(String txId, bool isFlagged) async {
+    if (txId.isEmpty) return;
+    try {
+      final col = transactionsCollection;
+      if (col != null) {
+        await col.doc(txId).set({
+          'isFlagged': isFlagged,
+          'updatedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {}
+  }
+
+  /// Reverse a transaction
+  Future<void> reverseTransaction(Map<String, dynamic> tx) async {
+    final originalAmount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
+    final userId = tx['userId'] as String? ?? '';
+    final originalType = tx['type'] as String? ?? '';
+    final currency = tx['currency'] as String? ?? _resolveCurrencyCode();
+    
+    if (userId.isEmpty || originalAmount == 0) return;
+
+    // Determine reversal type and amount logic
+    // If original was a deposit/received (+), reversal is a withdrawal (-)
+    // If original was a withdrawal/transfer (-), reversal is a deposit (+)
+    String reverseType = 'reversal';
+    double balanceDelta = 0;
+    
+    if (originalType == 'deposit' || originalType == 'received') {
+      balanceDelta = -originalAmount;
+    } else {
+      balanceDelta = originalAmount;
+    }
+
+    await addTransaction(
+      userId: userId,
+      amount: originalAmount, // usually kept positive in records, delta logic handles balance
+      type: reverseType,
+      title: 'Reversal: ${tx['title']}',
+      currency: currency,
+      metadata: {
+        'originalTransactionId': tx['id'],
+        'reversal': true,
+      },
+    );
+
+    await updateUserBalance(userId, balanceDelta);
+
+    // Update the original transaction to mark it as reversed
+    if (tx['id'] != null) {
+      try {
+        final col = transactionsCollection;
+        if (col != null) {
+          await col.doc(tx['id']).set({
+            'isReversed': true,
+            'updatedAt': DateTime.now().toIso8601String(),
+          }, SetOptions(merge: true));
+        }
+      } catch (_) {}
     }
   }
 
@@ -564,6 +672,10 @@ class FirestoreService {
         'identityType': kycData['identityType'] ?? kycData['identity_type'],
       if (kycData['identityNumber'] != null || kycData['identity_number'] != null)
         'identityNumber': kycData['identityNumber'] ?? kycData['identity_number'],
+      if (kycData['identityImagePath'] != null)
+        'identityImagePath': kycData['identityImagePath'],
+      if (kycData['selfieImagePath'] != null)
+        'selfieImagePath': kycData['selfieImagePath'],
       'updatedAt': nowIso,
     });
 
@@ -646,13 +758,23 @@ class FirestoreService {
     final col = supportChatsCollection;
     if (col == null) return Stream.value([]);
     try {
-      return col.orderBy('updatedAt', descending: true).snapshots().map((snapshot) {
-        return snapshot.docs.map((doc) {
+      return col.snapshots().map((snapshot) {
+        final list = snapshot.docs.map((doc) {
           final data = doc.data();
           data['id'] = doc.id;
           return data;
         }).toList();
-      });
+        list.sort((a, b) {
+          final aTs = a['updatedAt'] as String? ?? '';
+          final bTs = b['updatedAt'] as String? ?? '';
+          return bTs.compareTo(aTs);
+        });
+        return list;
+      }).handleError((dynamic _) {/* swallow errors; return empty below */}, test: (_) => true).transform(
+        StreamTransformer.fromHandlers(
+          handleError: (error, stack, sink) => sink.add(<Map<String, dynamic>>[]),
+        ),
+      );
     } catch (_) {
       return Stream.value([]);
     }
@@ -708,4 +830,77 @@ class FirestoreService {
       return false;
     }
   }
+
+  // --- Admin Queries ---
+
+  /// Stream ALL users (admin only).
+  /// No Firestore index required — fetches all docs and sorts client-side.
+  Stream<List<Map<String, dynamic>>> streamAllUsers() {
+    final col = usersCollection;
+    if (col == null) return Stream.value([]);
+    try {
+      return col.snapshots().map((snapshot) {
+        final list = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        list.sort((a, b) {
+          final aTs = (a['updatedAt'] ?? a['createdAt'] ?? '') as String;
+          final bTs = (b['updatedAt'] ?? b['createdAt'] ?? '') as String;
+          return bTs.compareTo(aTs);
+        });
+        return list;
+      }).handleError((_) => <Map<String, dynamic>>[]);
+    } catch (_) {
+      return Stream.value([]);
+    }
+  }
+
+  /// Stream ALL transactions across all users (admin only), limited to [limit].
+  /// No Firestore index required — fetches all docs and sorts client-side.
+  Stream<List<Map<String, dynamic>>> streamAllTransactions({int limit = 50}) {
+    final col = transactionsCollection;
+    if (col == null) return Stream.value([]);
+    try {
+      return col.snapshots().map((snapshot) {
+        final list = snapshot.docs.map((doc) {
+          final data = doc.data();
+          data['id'] = doc.id;
+          return data;
+        }).toList();
+        list.sort((a, b) {
+          final aTs = (a['createdAt'] ?? '') as String;
+          final bTs = (b['createdAt'] ?? '') as String;
+          return bTs.compareTo(aTs);
+        });
+        return list.take(limit).toList();
+      }).handleError((_) => <Map<String, dynamic>>[]);
+    } catch (_) {
+      return Stream.value([]);
+    }
+  }
+
+  Stream<List<Map<String, dynamic>>> streamPendingKycUsers() {
+    return streamAllUsers().map((list) {
+      return list.where((user) {
+        final status = user['kycStatus'] as String?;
+        return status == 'pending' || status == 'flagged' || status == 'submitted';
+      }).toList();
+    }).handleError((_) => <Map<String, dynamic>>[]);
+  }
+
+  /// Update a user's KYC status (admin action: 'verified' | 'flagged' | 'rejected')
+  Future<void> updateUserKycStatus(String uid, String status, {String? reason, List<String>? checks, String? reviewedBy}) async {
+    if (uid.isEmpty) return;
+    final nowIso = DateTime.now().toIso8601String();
+    await setUserProfile(uid, {
+      'kycStatus': status,
+      'kycReviewedAt': nowIso,
+      if (reason != null && reason.isNotEmpty) 'kycFlagReason': reason,
+      if (checks != null && checks.isNotEmpty) 'kycChecks': checks,
+      if (reviewedBy != null && reviewedBy.isNotEmpty) 'kycReviewedBy': reviewedBy,
+    });
+  }
 }
+

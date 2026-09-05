@@ -35,6 +35,15 @@ extension AppCurrencyExtension on AppCurrency {
     }
   }
 
+  double get exchangeRateToJmd {
+    switch (this) {
+      case AppCurrency.jmd: return 1.0;
+      case AppCurrency.usd: return 155.0;
+      case AppCurrency.gbp: return 195.0;
+      case AppCurrency.cad: return 115.0;
+    }
+  }
+
   String format(double amount) => '$symbol${amount.toStringAsFixed(2)}';
   String formatNoDecimal(double amount) => '$symbol${amount.toStringAsFixed(0)}';
 }

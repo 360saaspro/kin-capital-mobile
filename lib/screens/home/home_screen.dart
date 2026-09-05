@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -11,17 +12,18 @@ import '../activity/transaction_detail_screen.dart';
 import '../capital_rails/kin_capital_rails_screen.dart';
 import '../pots/yard_pot_screen.dart';
 import '../pots/set_goal_identity_screen.dart';
-import '../send/recipients_screen.dart';
 import 'add_money_methods_screen.dart';
 import 'notifications_screen.dart';
 import '../profile/profile_screen.dart';
+import '../main_screen.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/currency_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? entityId;
-  const HomeScreen({super.key, this.entityId});
+  final void Function(int tabIndex)? onSwitchTab;
+  const HomeScreen({super.key, this.entityId, this.onSwitchTab});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -31,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
   late final String _entityId;
   CreditOffer? _credit;
-  LedgerResponse? _ledger;
   bool _hasApplied = false;
 
   double _toDouble(dynamic val, [double fallback = 0.0]) {
@@ -83,7 +84,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
       if (mounted) {
         setState(() {
-          _ledger = results[0] as LedgerResponse;
           _credit = results[1] as CreditOffer;
           _hasApplied = hasApplied;
         });
@@ -118,7 +118,11 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Send Money Home'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipientsScreen()));
+                if (widget.onSwitchTab != null) {
+                  widget.onSwitchTab!(1);
+                } else {
+                  MainScreen.switchToTab(context, 1);
+                }
               },
             ),
             ListTile(
@@ -225,6 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         final nameParts = rawName.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
         final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+        
+        final rawPhotoUrl = AuthService.instance.fallbackPhotoUrl ?? profile?['photoURL'] ?? AuthService.instance.currentUser?.photoURL;
 
         return Column(
           children: [
@@ -235,10 +241,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     GestureDetector(
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-                      child: const CircleAvatar(
+                      child: CircleAvatar(
                         radius: 20,
                         backgroundColor: AppColors.primaryTeal,
-                        child: Icon(Icons.person, color: Colors.white, size: 20),
+                        backgroundImage: rawPhotoUrl != null 
+                            ? (rawPhotoUrl.toString().startsWith('data:image')
+                                ? MemoryImage(base64Decode(rawPhotoUrl.toString().split(',').last)) as ImageProvider
+                                : NetworkImage(rawPhotoUrl))
+                            : null,
+                        child: rawPhotoUrl == null ? const Icon(Icons.person, color: Colors.white, size: 20) : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -396,7 +407,13 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipientsScreen())),
+          onTap: () {
+            if (widget.onSwitchTab != null) {
+              widget.onSwitchTab!(1);
+            } else {
+              MainScreen.switchToTab(context, 1);
+            }
+          },
           borderRadius: BorderRadius.circular(20),
           splashColor: Colors.white.withValues(alpha: 0.2),
           highlightColor: Colors.white.withValues(alpha: 0.1),
@@ -631,6 +648,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _formatDate(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final month = months[dt.month - 1];
+      final day = dt.day;
+      final year = dt.year;
+      
+      int hour = dt.hour;
+      final amPm = hour >= 12 ? 'PM' : 'AM';
+      if (hour > 12) hour -= 12;
+      if (hour == 0) hour = 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      
+      return '$month $day, $year • ${hour.toString().padLeft(2, '0')}:$minute $amPm';
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// 4. Recent Activity connected to Firestore transactions collection
   Widget _buildRealtimeTransfers(String uid) {
     return StreamBuilder<List<Map<String, dynamic>>>(
@@ -663,7 +700,17 @@ class _HomeScreenState extends State<HomeScreen> {
             final amt = _toDouble(tx['amount']);
             final type = tx['type'] ?? 'payment';
             final isNegative = amt < 0;
-            final amtStr = isNegative ? '- ${CurrencyService.instance.symbol}${amt.abs().toStringAsFixed(2)}' : '+ ${CurrencyService.instance.symbol}${amt.toStringAsFixed(2)}';
+            final c = tx['currency'] as String? ?? (tx['metadata'] as Map<String, dynamic>?)?['currency'] as String?;
+            final sym = _getCurrencySymbol(c);
+            final amtStr = isNegative ? '- $sym${amt.abs().toStringAsFixed(2)}' : '+ $sym${amt.toStringAsFixed(2)}';
+
+            final createdAt = tx['createdAt'] as String?;
+            final dateStr = createdAt != null ? _formatDate(createdAt) : '';
+            
+            final metadata = tx['metadata'] as Map<String, dynamic>?;
+            final recipientGets = metadata?['recipientGets'];
+            final exchangeRate = metadata?['exchangeRate'];
+            final fee = metadata?['fee'];
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -671,6 +718,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 name: title,
                 time: '$type • Processed',
                 amount: amtStr,
+                date: dateStr,
+                recipientGets: recipientGets,
+                exchangeRate: exchangeRate,
+                fee: fee,
               ),
             );
           }).toList(),
@@ -681,10 +732,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTransactionItem({
     required String name, required String time, required String amount,
+    String? date, String? recipientGets, String? exchangeRate, String? fee,
   }) {
     final isNegative = amount.contains('-');
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TransactionDetailScreen())),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TransactionDetailScreen(
+        title: name,
+        amount: amount,
+        time: date != null && date.isNotEmpty ? date : time,
+        isNegative: isNegative,
+        recipientGets: recipientGets?.toString(),
+        exchangeRate: exchangeRate?.toString(),
+        fee: fee?.toString(),
+      ))),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
@@ -717,5 +777,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  String _getCurrencySymbol(String? c) {
+    switch ((c ?? 'JMD').toUpperCase()) {
+      case 'JMD': return 'J\$';
+      case 'USD': return 'US\$';
+      case 'GBP': return '£';
+      case 'CAD': return 'CA\$';
+      default: return 'J\$';
+    }
   }
 }

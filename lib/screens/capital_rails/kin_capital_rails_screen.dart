@@ -548,7 +548,7 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  r.selectedRoute,
+                  _formatRouteName(r.selectedRoute),
                   style: AppTheme.bodyStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -623,4 +623,14 @@ class _KinCapitalRailsScreenState extends State<KinCapitalRailsScreen> {
     );
   }
 
+  String _formatRouteName(String raw) {
+    if (raw.trim().isEmpty) return raw;
+    final withSpaces = raw.trim().replaceAll('_', ' ');
+    return withSpaces.split(' ').where((w) => w.isNotEmpty).map((word) {
+      if (word == '->' || word == 'USDC' || word == 'MTO' || word == 'SWIFT' || word == 'P2P') {
+        return word;
+      }
+      return word[0].toUpperCase() + (word.length > 1 ? word.substring(1).toLowerCase() : '');
+    }).join(' ');
+  }
 }

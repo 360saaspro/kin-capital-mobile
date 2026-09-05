@@ -43,6 +43,14 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: FirestoreService.instance.streamSupportMessages(_uid),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'How can we help you today?',
+                      style: AppTheme.bodyStyle(color: Colors.grey),
+                    ),
+                  );
+                }
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }

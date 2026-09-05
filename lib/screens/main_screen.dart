@@ -6,23 +6,37 @@ import 'cards/cards_screen.dart';
 import 'send/recipients_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+  const MainScreen({super.key, this.initialIndex = 0});
+
+  static void switchToTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<_MainScreenState>();
+    if (state != null) {
+      state.onItemTapped(index);
+    }
+  }
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    RecipientsScreen(),
-    CardsScreen(),
-    ProfileScreen(),
+  late final List<Widget> _screens = [
+    HomeScreen(onSwitchTab: onItemTapped),
+    const RecipientsScreen(),
+    const CardsScreen(),
+    const ProfileScreen(),
   ];
 
-  void _onItemTapped(int index) {
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
+
+  void onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
@@ -74,7 +88,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildNavItem(int index, IconData outlineIcon, IconData filledIcon, String label) {
     final isSelected = _selectedIndex == index;
     return GestureDetector(
-      onTap: () => _onItemTapped(index),
+      onTap: () => onItemTapped(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),

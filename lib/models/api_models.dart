@@ -170,7 +170,7 @@ class AuditResponse {
 class OrchestrationResult {
   final String entityId;
   final String intent;
-  final String state;
+  final Map<String, dynamic> state;
   final String? llmReasoning;
   final List<String> plan;
   final Map<String, dynamic>? results;
@@ -187,7 +187,7 @@ class OrchestrationResult {
   factory OrchestrationResult.fromJson(Map<String, dynamic> j) => OrchestrationResult(
         entityId: j['entity_id'] as String? ?? '',
         intent: j['intent'] as String? ?? '',
-        state: j['state'] as String? ?? '',
+        state: j['state'] as Map<String, dynamic>? ?? {},
         llmReasoning: j['llm_reasoning'] as String?,
         plan: (j['plan'] as List<dynamic>?)?.map((p) => p.toString()).toList() ?? [],
         results: j['results'] as Map<String, dynamic>?,

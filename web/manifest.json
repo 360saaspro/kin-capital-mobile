@@ -1,11 +1,11 @@
 {
-    "name": "kin_app",
-    "short_name": "kin_app",
+    "name": "Kin",
+    "short_name": "Kin",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#004D46",
+    "theme_color": "#004D46",
+    "description": "Kin - Caribbean-first digital banking and financial platform.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

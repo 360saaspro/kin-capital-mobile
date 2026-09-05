@@ -258,6 +258,9 @@ class _YardPotScreenState extends State<YardPotScreen> {
                           amount: entered,
                           type: 'pot_deposit',
                           title: 'Saved to ${activePot['title'] ?? 'Yard Pot'}',
+                          metadata: {
+                            'currency': CurrencyService.instance.currency.value.name.toUpperCase(),
+                          },
                         );
 
                         if (mounted) {

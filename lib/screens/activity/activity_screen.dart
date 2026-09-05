@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
@@ -148,7 +148,17 @@ class _ActivityScreenState extends State<ActivityScreen> {
                           final amt = (tx['amount'] as num?)?.toDouble() ?? 0.0;
                           final type = tx['type'] ?? 'payment';
                           final isNegative = amt < 0;
-                          final amountText = isNegative ? '- J\$${amt.abs().toStringAsFixed(2)}' : '+ J\$${amt.toStringAsFixed(2)}';
+                          final c = tx['currency'] as String? ?? (tx['metadata'] as Map<String, dynamic>?)?['currency'] as String?;
+                          final sym = _getCurrencySymbol(c);
+                          final amountText = isNegative ? '- $sym${amt.abs().toStringAsFixed(2)}' : '+ $sym${amt.toStringAsFixed(2)}';
+
+                          final createdAt = tx['createdAt'] as String?;
+                          final dateStr = createdAt != null ? _formatDate(createdAt) : '';
+                          
+                          final metadata = tx['metadata'] as Map<String, dynamic>?;
+                          final recipientGets = metadata?['recipientGets'];
+                          final exchangeRate = metadata?['exchangeRate'];
+                          final fee = metadata?['fee'];
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
@@ -157,6 +167,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
                               title: title,
                               time: '$type • Processed',
                               amount: amountText,
+                              date: dateStr,
+                              recipientGets: recipientGets,
+                              exchangeRate: exchangeRate,
+                              fee: fee,
                               icon: isNegative ? Icons.send_outlined : Icons.add_circle_outline,
                             ),
                           );
@@ -218,19 +232,48 @@ class _ActivityScreenState extends State<ActivityScreen> {
     );
   }
 
+  String _formatDate(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final month = months[dt.month - 1];
+      final day = dt.day;
+      final year = dt.year;
+      
+      int hour = dt.hour;
+      final amPm = hour >= 12 ? 'PM' : 'AM';
+      if (hour > 12) hour -= 12;
+      if (hour == 0) hour = 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      
+      return '$month $day, $year • ${hour.toString().padLeft(2, '0')}:$minute $amPm';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Widget _buildTransactionItem(
     BuildContext context, {
     required String title,
     required String time,
     required String amount,
     required IconData icon,
+    String? date, String? recipientGets, String? exchangeRate, String? fee,
   }) {
     final isNegative = amount.contains('-');
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const TransactionDetailScreen()),
+          MaterialPageRoute(builder: (_) => TransactionDetailScreen(
+            title: title,
+            amount: amount,
+            time: date != null && date.isNotEmpty ? date : time,
+            isNegative: isNegative,
+            recipientGets: recipientGets?.toString(),
+            exchangeRate: exchangeRate?.toString(),
+            fee: fee?.toString(),
+          )),
         );
       },
       child: Container(
@@ -243,7 +286,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.kinMistLight,
                 shape: BoxShape.circle,
               ),
@@ -261,27 +304,30 @@ class _ActivityScreenState extends State<ActivityScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  Text(
-                    time,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.kinInk.withValues(alpha: 0.5),
-                    ),
-                  ),
+                  if (time.isNotEmpty) Text(time, style: AppTheme.bodyStyle(color: AppColors.kinInk.withValues(alpha: 0.5), fontSize: 12)),
                 ],
               ),
             ),
-            Text(
-              amount,
-              style: AppTheme.dataStyle(
-                color: isNegative ? AppColors.kinCoral : AppColors.primary,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(amount, style: AppTheme.dataStyle(fontWeight: FontWeight.bold, color: isNegative ? AppColors.kinCoral : AppColors.kinTeal)),
+                const Text('Success', style: TextStyle(fontSize: 10, color: AppColors.kinTeal, fontWeight: FontWeight.bold)),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _getCurrencySymbol(String? c) {
+    switch ((c ?? 'JMD').toUpperCase()) {
+      case 'JMD': return 'J\$';
+      case 'USD': return 'US\$';
+      case 'GBP': return '£';
+      case 'CAD': return 'CA\$';
+      default: return 'J\$';
+    }
   }
 }

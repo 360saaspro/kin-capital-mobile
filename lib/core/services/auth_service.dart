@@ -1,4 +1,4 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/app_config.dart';
 import 'firestore_service.dart';
@@ -19,6 +19,7 @@ class AuthService {
   final FirebaseAuth? _customAuth;
   final FirestoreService? _customFirestore;
   String? _fallbackUid;
+  String? fallbackPhotoUrl;
   bool _isSignedOut = false;
 
   AuthService({FirebaseAuth? auth, FirestoreService? firestore})
@@ -26,6 +27,42 @@ class AuthService {
       _customFirestore = firestore;
 
   static final AuthService instance = AuthService();
+
+  String _generateAccountNumber() {
+    final rand = math.Random();
+    final buffer = StringBuffer();
+    for (int i = 0; i < 10; i++) {
+      buffer.write(rand.nextInt(10));
+    }
+    return buffer.toString();
+  }
+
+  String _generateTransitBankCode() {
+    final codes = [
+      '100012345', // Simulate National Commercial Bank (NCB)
+      '719234567', // Simulate Scotiabank Jamaica
+      '030012348', // Simulate JN Bank
+      '060012340', // Simulate Sagicor Bank
+      '050012349', // Simulate JMMB Bank
+    ];
+    final rand = math.Random();
+    return codes[rand.nextInt(codes.length)];
+  }
+
+  Future<void> ensureAccountDetailsGenerated() async {
+    final uid = currentUid;
+    if (uid.isEmpty) return;
+
+    final profile = await _firestore.getUserProfile(uid);
+    if (profile != null) {
+      if (!profile.containsKey('accountNumber') || profile['accountNumber'] == null) {
+        await _firestore.setUserProfile(uid, {
+          'accountNumber': _generateAccountNumber(),
+          'transitBankCode': _generateTransitBankCode(),
+        });
+      }
+    }
+  }
 
   FirebaseAuth? get _auth {
     if (_customAuth != null) return _customAuth;
@@ -191,11 +228,13 @@ class AuthService {
           'email': cleanEmail,
           'fullName': cleanName,
           'phone': cleanPhone,
-          'role': 'user',
+          'role': cleanEmail.toLowerCase() == 'admin@kin.app' ? 'admin' : 'user',
           'accountType': 'personal',
           'tier': 'standard',
           'balance': 0.00,
           'kycStatus': 'Verified',
+          'accountNumber': _generateAccountNumber(),
+          'transitBankCode': _generateTransitBankCode(),
           'createdAt': DateTime.now().toIso8601String(),
         });
       }
@@ -232,12 +271,19 @@ class AuthService {
             'email': credential.user!.email ?? cleanEmail,
             'fullName': credential.user!.displayName ?? 'Kin User',
             'phone': '+1 (876) 123-4567',
-            'role': 'user',
+            'role': cleanEmail.toLowerCase() == 'admin@kin.app' ? 'admin' : 'user',
             'accountType': 'personal',
             'tier': 'standard',
             'balance': 0.00,
             'kycStatus': 'Verified',
+            'accountNumber': _generateAccountNumber(),
+            'transitBankCode': _generateTransitBankCode(),
             'createdAt': DateTime.now().toIso8601String(),
+          });
+        } else if (!profile.containsKey('accountNumber') || profile['accountNumber'] == null) {
+          await _firestore.setUserProfile(credential.user!.uid, {
+            'accountNumber': _generateAccountNumber(),
+            'transitBankCode': _generateTransitBankCode(),
           });
         }
       }

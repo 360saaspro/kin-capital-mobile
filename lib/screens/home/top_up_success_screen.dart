@@ -1,9 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
-import '../send/recipients_screen.dart';
+import '../main_screen.dart';
 
 class TopUpSuccessScreen extends StatelessWidget {
   final double amount;
@@ -14,31 +14,45 @@ class TopUpSuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              _buildSuccessIcon(),
-              const SizedBox(height: 40),
-              Text(
-                'Balance updated!',
-                style: AppTheme.headingStyle(fontSize: 32),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 40),
+                        _buildSuccessIcon(),
+                        const SizedBox(height: 30),
+                        Text(
+                          'Balance updated!',
+                          style: AppTheme.headingStyle(fontSize: 32),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'J\$${amount.toStringAsFixed(2)} is now ready to send or\nspend.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
+                        ),
+                        const SizedBox(height: 40),
+                        _buildBalanceCard(),
+                        const SizedBox(height: 40),
+                        const Spacer(),
+                        _buildActionButtons(context),
+                        const SizedBox(height: 30),
+                        _buildFooterIcons(),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'J\$${amount.toStringAsFixed(2)} is now ready to send or\nspend.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey[600], fontSize: 16, height: 1.5),
-              ),
-              const SizedBox(height: 60),
-              _buildBalanceCard(),
-              const Spacer(),
-              _buildActionButtons(context),
-              const SizedBox(height: 40),
-              _buildFooterIcons(),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -112,7 +126,16 @@ class TopUpSuccessScreen extends StatelessWidget {
                     children: [
                       Text('J\$', style: AppTheme.headingStyle(fontSize: 24, color: Colors.white)),
                       const SizedBox(width: 4),
-                      Text(bal.toStringAsFixed(2), style: AppTheme.headingStyle(fontSize: 40, color: Colors.white)),
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            bal.toStringAsFixed(2),
+                            style: AppTheme.headingStyle(fontSize: 40, color: Colors.white),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const Spacer(),
@@ -148,9 +171,10 @@ class TopUpSuccessScreen extends StatelessWidget {
         const SizedBox(height: 16),
         OutlinedButton(
           onPressed: () {
-            Navigator.push(
+            Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const RecipientsScreen()),
+              MaterialPageRoute(builder: (context) => const MainScreen(initialIndex: 1)),
+              (route) => false,
             );
           },
           style: OutlinedButton.styleFrom(

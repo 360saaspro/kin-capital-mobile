@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../services/app_config.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/currency_service.dart';
 import 'processing_transfer_screen.dart';
 
 class SendAmountScreen extends StatefulWidget {
@@ -14,6 +15,8 @@ class SendAmountScreen extends StatefulWidget {
   final String recipientName;
   final String? avatarUrl;
   final String flagEmoji;
+  final String? accountNumber;
+  final String? transitBankCode;
 
   const SendAmountScreen({
     super.key,
@@ -21,6 +24,8 @@ class SendAmountScreen extends StatefulWidget {
     required this.recipientName,
     this.avatarUrl,
     this.flagEmoji = '🇯🇲',
+    this.accountNumber,
+    this.transitBankCode,
   });
 
   @override
@@ -35,8 +40,6 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
 
   bool _loading = false;
   RouteResult? _route;
-
-  static const double _exchangeRate = 195.0; // 1 USD = 195 JMD (demo)
 
   @override
   void initState() {
@@ -70,6 +73,17 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
   }
 
   Future<void> _handleExecuteTransfer(double amount) async {
+    if (widget.accountNumber != null) {
+      setState(() => _loading = true);
+      await Future.delayed(const Duration(seconds: 1)); // Simulate validation
+      setState(() => _loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account validation successful: Name matches.'), backgroundColor: AppColors.primaryTeal),
+        );
+      }
+    }
+
     try {
       final uid = AuthService.instance.currentUid;
       // Deduct balance from Firestore
@@ -81,10 +95,10 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
         amount: -amount,
         type: 'transfer',
         title: 'Transfer to ${widget.recipientName}',
+        currency: CurrencyService.instance.currency.value.code,
         metadata: {
           'counterparty': widget.recipientName,
           'status': 'Success',
-          'currency': 'USD/JMD',
         },
       );
     } catch (e) {
@@ -104,16 +118,35 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
     }
   }
 
+  String _formatRouteName(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return 'Stablecoin Settlement';
+    final trimmed = raw.trim();
+    
+    // Replace underscores with spaces
+    final withSpaces = trimmed.replaceAll('_', ' ');
+    
+    // Title-case each word while preserving symbols and common acronyms
+    return withSpaces.split(' ').where((w) => w.isNotEmpty).map((word) {
+      if (word == '->' || word == 'USDC' || word == 'MTO' || word == 'SWIFT' || word == 'P2P') {
+        return word;
+      }
+      return word[0].toUpperCase() + (word.length > 1 ? word.substring(1).toLowerCase() : '');
+    }).join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amountController.text) ?? 0;
     final fee = _route?.fee ?? 0;
     final feePct = _route?.feePct ?? 5.0;
     final eta = _route?.eta ?? 'seconds';
-    final routeName = _route?.selectedRoute ?? 'Stablecoin';
+    final routeName = _formatRouteName(_route?.selectedRoute ?? 'Stablecoin Settlement');
+    
+    final currency = CurrencyService.instance.currency.value;
+    final exchangeRate = currency.exchangeRateToJmd;
 
-    final recipientAmount = amount * _exchangeRate;
-    final feeDisplay = fee > 0 ? '\$${fee.toStringAsFixed(2)}' : '\$${(amount * 0.05).toStringAsFixed(2)}';
+    final recipientAmount = amount * exchangeRate;
+    final feeDisplay = fee > 0 ? '${currency.symbol}${fee.toStringAsFixed(2)}' : '${currency.symbol}${(amount * 0.05).toStringAsFixed(2)}';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -162,14 +195,14 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text('\$', style: AppTheme.headingStyle(fontSize: 48, color: AppColors.primaryTeal)),
+                  Text(currency.symbol, style: AppTheme.headingStyle(fontSize: 48, color: AppColors.primaryTeal)),
                   SizedBox(
-                    width: 150,
+                    width: 250,
                     child: TextField(
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: AppTheme.headingStyle(fontSize: 80, color: AppColors.primaryTeal),
+                      style: AppTheme.headingStyle(fontSize: 56, color: AppColors.primaryTeal),
                       decoration: const InputDecoration(border: InputBorder.none),
                       onChanged: (_) => _fetchRoute(),
                     ),
@@ -179,12 +212,12 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
 
               const SizedBox(height: 16),
               Text(
-                '${widget.recipientName} gets \$${recipientAmount.toStringAsFixed(0)} JMD',
+                '${widget.recipientName} gets ${currency.symbol}${recipientAmount.toStringAsFixed(0)} JMD',
                 style: AppTheme.headingStyle(fontSize: 20),
               ),
               const SizedBox(height: 8),
               Text(
-                'FEE: $feeDisplay • RATE: 1 USD = $_exchangeRate JMD',
+                'FEE: $feeDisplay • RATE: 1 ${currency.code} = $exchangeRate JMD',
                 style: AppTheme.bodyStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 4),
@@ -230,7 +263,7 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
 
               // Swipe Button
               SwipeToSendButton(
-                text: '→ Swipe to send \$${amount.toStringAsFixed(0)}',
+                text: '→ Swipe to send ${currency.symbol}${amount.toStringAsFixed(0)}',
                 onCompleted: () => _handleExecuteTransfer(amount),
               ),
 
@@ -271,9 +304,13 @@ class _SendAmountScreenState extends State<SendAmountScreen> {
         ),
         child: Column(
           children: [
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: selected ? AppColors.kinInk : Colors.grey[700])),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, color: selected ? AppColors.kinInk : Colors.grey[700]),
+            ),
             const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
             if (saveText != null) ...[
               const SizedBox(height: 8),
               Container(

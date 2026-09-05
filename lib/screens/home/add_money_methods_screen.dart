@@ -3,6 +3,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'top_up_amount_screen.dart';
 import 'bank_handoff_screen.dart';
+import '../profile/support_chat_screen.dart';
 
 class AddMoneyMethodsScreen extends StatelessWidget {
   const AddMoneyMethodsScreen({super.key});
@@ -30,16 +31,6 @@ class AddMoneyMethodsScreen extends StatelessWidget {
             const SizedBox(height: 32),
             _buildMethodCard(
               context,
-              'Easy Bank Transfer',
-              'Instant, secure transfer via Open Banking. No manual entry needed.',
-              Icons.account_balance_outlined,
-              destination: const BankHandoffScreen(),
-              isRecommended: true,
-              tags: ['Instant', 'Secure'],
-              tagIcons: [Icons.bolt, Icons.verified_user_outlined],
-            ),
-            _buildMethodCard(
-              context,
               'Debit Card',
               'Add money using your Mastercard or Visa.',
               Icons.credit_card_outlined,
@@ -47,6 +38,16 @@ class AddMoneyMethodsScreen extends StatelessWidget {
               footer: 'Small fee applies',
               iconColor: Colors.red[100]!,
               iconTextColor: Colors.red[700]!,
+            ),
+            _buildMethodCard(
+              context,
+              'Easy Bank Transfer',
+              'Instant, secure transfer via Open Banking. No manual entry needed.',
+              Icons.account_balance_outlined,
+              destination: const BankHandoffScreen(),
+              isRecommended: true,
+              tags: ['Instant', 'Secure'],
+              tagIcons: [Icons.bolt, Icons.verified_user_outlined],
             ),
             _buildMethodCard(
               context,
@@ -63,7 +64,7 @@ class AddMoneyMethodsScreen extends StatelessWidget {
             const SizedBox(height: 32),
             _buildSupportCard(),
             const SizedBox(height: 24),
-            _buildChatLink(),
+            _buildChatLink(context),
             const SizedBox(height: 40),
           ],
         ),
@@ -219,12 +220,17 @@ class AddMoneyMethodsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChatLink() {
+  Widget _buildChatLink(BuildContext context) {
     return Center(
       child: TextButton.icon(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SupportChatScreen()),
+          );
+        },
         icon: const Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.primaryTeal),
-        label: Text('Chat with Kin Support', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
+        label: const Text('Chat with Kin Support', style: TextStyle(color: AppColors.primaryTeal, fontWeight: FontWeight.bold)),
       ),
     );
   }

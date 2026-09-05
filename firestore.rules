@@ -12,21 +12,37 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // User profile document and all user subcollections (pots, contributors, activities, cards, recipients, kyc)
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || !isAuthenticated();
+      // Document-level: owner or admin can read/write their own doc
+      allow read, write: if isOwner(userId) || isAdmin() || !isAuthenticated();
 
       // Recursive match for all subcollections under users/{userId}
       match /{allSubcollections=**} {
-        allow read, write: if isOwner(userId) || !isAuthenticated();
+        allow read, write: if isOwner(userId) || isAdmin() || !isAuthenticated();
       }
+    }
+
+    // Allow admins to LIST the entire users collection (needed for admin panel queries)
+    match /users/{userId} {
+      allow list: if isAdmin() || !isAuthenticated();
     }
 
     // Banking Transactions collection
     match /transactions/{transactionId} {
-      allow read: if !isAuthenticated() || (isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid));
-      allow create: if !isAuthenticated() || (isAuthenticated() && request.resource.data.userId == request.auth.uid);
-      allow update, delete: if !isAuthenticated() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      // Document-level read: own transaction or admin
+      allow read: if !isAuthenticated() || (isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin()));
+      allow create: if !isAuthenticated() || (isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin()));
+      allow update, delete: if !isAuthenticated() || (isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()));
+    }
+
+    // Allow admins to LIST the entire transactions collection (needed for admin panel queries)
+    match /transactions/{transactionId} {
+      allow list: if isAdmin() || !isAuthenticated();
     }
 
     // Accounts collection
@@ -48,6 +64,10 @@ service cloud.firestore {
         allow read, write: if true;
       }
     }
+
+    // Admin settings (analytics, credit config, etc.)
+    match /admin_settings/{docId} {
+      allow read, write: if isAdmin() || !isAuthenticated();
+    }
   }
 }
-

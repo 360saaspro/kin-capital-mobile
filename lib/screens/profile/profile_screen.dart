@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
+import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,14 +8,10 @@ import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
 import '../auth/onboarding_screen.dart';
-import 'security_center_screen.dart';
+
 import 'personal_details_screen.dart';
-import 'bank_accounts_screen.dart';
-import '../home/receiver_home_screen.dart';
 import '../../core/services/currency_service.dart';
-import '../admin/admin_panel_screen.dart';
 import '../home/notifications_screen.dart';
-import '../cards/cards_screen.dart';
 import '../auth/forgot_password_screen.dart';
 import 'support_chat_screen.dart';
 
@@ -28,6 +24,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isUploadingImage = false;
+  String? _localPhotoUrl;
 
   Future<void> _handleLogout(BuildContext context) async {
     await AuthService.instance.signOut();
@@ -43,21 +40,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickAndUploadImage() async {
     try {
       final picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800);
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery, 
+        maxWidth: 200, 
+        maxHeight: 200, 
+        imageQuality: 50,
+      );
       
       if (image == null) return;
       
       setState(() => _isUploadingImage = true);
 
       final uid = AuthService.instance.currentUid;
-      final ext = image.name.split('.').last;
-      final ref = FirebaseStorage.instance.ref().child('profile_pictures/$uid.$ext');
+      final bytes = await image.readAsBytes();
       
-      await ref.putFile(File(image.path));
-      final downloadUrl = await ref.getDownloadURL();
+      String downloadUrl;
+      try {
+        final ext = image.name.split('.').last;
+        final ref = FirebaseStorage.instance.ref().child('profile_pictures/$uid.$ext');
+        await ref.putData(bytes);
+        downloadUrl = await ref.getDownloadURL();
+      } catch (e) {
+        // Fallback to base64 data URI if Storage fails (e.g. auth/permission error in demo mode)
+        final base64String = base64Encode(bytes);
+        final ext = image.name.split('.').last.toLowerCase();
+        downloadUrl = 'data:image/$ext;base64,$base64String';
+      }
       
-      await AuthService.instance.currentUser?.updatePhotoURL(downloadUrl);
-      await FirestoreService.instance.updateUserProfile(uid, {'photoURL': downloadUrl});
+      try {
+        await AuthService.instance.currentUser?.updatePhotoURL(downloadUrl);
+      } catch (_) {}
+      
+      await FirestoreService.instance.setUserProfile(uid, {'photoURL': downloadUrl});
+      
+      if (mounted) {
+        setState(() => _localPhotoUrl = downloadUrl);
+      }
+      AuthService.instance.fallbackPhotoUrl = downloadUrl;
       
     } catch (e) {
       if (mounted) {
@@ -77,10 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          'Profile',
-          style: AppTheme.headingStyle(fontSize: 20),
-        ),
         actions: [
           StreamBuilder<List<Map<String, dynamic>>>(
             stream: FirestoreService.instance.streamUserNotifications(AuthService.instance.currentUid),
@@ -141,26 +156,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSectionHeader('IDENTITY & LIMITS'),
             _buildSettingsItem(Icons.verified_user_outlined, 'KYC status', trailingText: 'Verified'),
 
-            
-            _buildSectionHeader('CARDS'),
-            _buildSettingsItem(
-              Icons.credit_card, 
-              'Manage physical and virtual cards',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CardsScreen()),
-                );
-              },
-            ),
+
             
             _buildSectionHeader('SECURITY'),
-            _buildSettingsItem(Icons.security, 'Security center', onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SecurityCenterScreen()),
-              );
-            }),
+
             _buildSettingsItem(
               Icons.lock_outline, 
               'Change Password',
@@ -171,9 +170,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               },
             ),
-            
-            _buildSectionHeader('NOTIFICATIONS'),
-            _buildSettingsItem(Icons.notifications_none, 'Push and email preferences'),
             
             _buildSectionHeader('HELP & SUPPORT'),
             _buildSettingsItem(
@@ -261,6 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final profile = snapshot.data;
         final name = profile?['fullName'] ?? AuthService.instance.currentUser?.displayName ?? 'Camille Stevenson';
         final email = profile?['email'] ?? AuthService.instance.currentUser?.email ?? 'camille@kin.app';
+        final rawPhotoUrl = _localPhotoUrl ?? AuthService.instance.fallbackPhotoUrl ?? profile?['photoURL'] ?? AuthService.instance.currentUser?.photoURL;
 
         return Column(
           children: [
@@ -283,12 +280,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         CircleAvatar(
                           radius: 50,
                           backgroundColor: Colors.white,
-                          backgroundImage: profile?['photoURL'] != null 
-                              ? NetworkImage(profile!['photoURL']) 
-                              : (AuthService.instance.currentUser?.photoURL != null 
-                                  ? NetworkImage(AuthService.instance.currentUser!.photoURL!) 
-                                  : null),
-                          child: (profile?['photoURL'] == null && AuthService.instance.currentUser?.photoURL == null) 
+                          backgroundImage: rawPhotoUrl != null 
+                              ? (rawPhotoUrl.toString().startsWith('data:image')
+                                  ? MemoryImage(base64Decode(rawPhotoUrl.toString().split(',').last)) as ImageProvider
+                                  : NetworkImage(rawPhotoUrl))
+                              : null,
+                          child: rawPhotoUrl == null 
                             ? const Text(
                                 'kin',
                                 style: TextStyle(
@@ -300,7 +297,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             : null,
                         ),
                         if (_isUploadingImage)
-                          const CircularProgressIndicator(color: Colors.white),
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Colors.white),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -388,35 +395,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsToggleItem(IconData icon, String title, bool value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: AppColors.kinMistLight.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.primaryTeal,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          title: Text(
-            title,
-            style: AppTheme.bodyStyle(fontWeight: FontWeight.w500, fontSize: 15),
-          ),
-          trailing: Switch.adaptive(
-            value: value,
-            onChanged: (v) {},
-            activeThumbColor: AppColors.primaryTeal,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildLogoutButton(BuildContext context) {
     return TextButton.icon(

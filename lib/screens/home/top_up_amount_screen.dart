@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/firestore_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/currency_service.dart';
 import 'top_up_success_screen.dart';
 
 class TopUpAmountScreen extends StatefulWidget {
@@ -58,6 +59,7 @@ class _TopUpAmountScreenState extends State<TopUpAmountScreen> {
         amount: parsedAmount,
         type: 'deposit',
         title: 'Top Up',
+        currency: CurrencyService.instance.currency.value.code,
         metadata: {
           'method': 'Debit Card / Bank Handoff',
           'status': 'Success',
